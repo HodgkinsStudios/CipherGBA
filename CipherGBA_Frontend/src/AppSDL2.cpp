@@ -969,14 +969,8 @@ struct Application {
                 rect.x=(w-rect.w)/2;rect.y=(h-rect.h)/2;
             }
             SDL_RenderCopy(renderer,texture,nullptr,&rect);
-        }else if(aboutArtwork_){
-            int w=0,h=0;SDL_GetRendererOutputSize(renderer,&w,&h);
-            const auto& art=pixelgba::artwork::kAboutArtwork;
-            const float factor=std::min(float(w-40)/art.width,float(h-40)/art.height);
-            const int bw=std::max(1,int(art.width*factor)),bh=std::max(1,int(art.height*factor));
-            SDL_Rect bannerRect{(w-bw)/2,(h-bh)/2,bw,bh};
-            SDL_RenderCopy(renderer,aboutArtwork_,nullptr,&bannerRect);
         }
+
         SDL_RenderPresent(renderer);
     }
     int loop(unsigned smokeFrameLimit=0){
@@ -1093,5 +1087,9 @@ int main(int argc,char** argv){
     if(!oldData.empty()&&!app.importLegacyData(userPath(oldData)))return 1;
     if(!bios.empty()&&!app.loadBios(userPath(bios)))return 1;
     if(!rom.empty()&&!app.loadRom(userPath(rom)))return 1;
+    // With no cartridge, expose the actual frontend controls immediately instead
+    // of using the About artwork as a full-window placeholder. Headless ROM
+    // smoke tests and command-line ROM launches bypass the startup menu.
+    if(rom.empty() && !smokeFrames)app.mainMenu();
     return app.loop(smokeFrames);
 }
