@@ -114,7 +114,7 @@
         SDL_GetRendererOutputSize(renderer,&rw,&rh);
         x=x*rw/std::max(1,ww);y=y*rh/std::max(1,wh);
     }
-    int uiFontWidth(const std::string& s)const{return static_cast<int>(s.size())*10;}
+    int uiFontWidth(const std::string& s)const{return static_cast<int>(s.size())*9;}
     int uiRootWidth(int index)const{
         return uiFontWidth(uiMenus()[static_cast<std::size_t>(index)].title)+36;
     }
@@ -162,7 +162,7 @@
     void uiLabel(int x,int baseline,const std::string& text,
                  std::uint32_t color=0xeef3f8){
         const int sc=uiScale();
-        const int fontPx=2*sc;
+        const int fontHeight=2*sc;
         const auto c=uiColor(color);
         SDL_SetRenderDrawColor(renderer,c.r,c.g,c.b,c.a);
         int column=0;
@@ -179,8 +179,13 @@
             if(glyph){
                 for(int row=0;row<7;++row)for(int px=0;px<5;++px){
                     if(glyph->rows[row][px]=='1'){
-                        const SDL_Rect pixel{(x+column*10+px*2)*sc,
-                            (baseline-15+row*2)*sc,fontPx,fontPx};
+                        // Resample the 5-column bitmap into an eight-pixel
+                        // glyph and retain a one-pixel inter-glyph gap. This
+                        // reproduces the v0.1 X11 9x15 fallback font metrics.
+                        const int begin=(px*8)/5;
+                        const int end=((px+1)*8)/5;
+                        const SDL_Rect pixel{(x+column*9+begin)*sc,
+                            (baseline-15+row*2)*sc,(end-begin)*sc,fontHeight};
                         SDL_RenderFillRect(renderer,&pixel);
                     }
                 }
