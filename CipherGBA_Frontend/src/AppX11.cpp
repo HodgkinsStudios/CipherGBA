@@ -64,8 +64,8 @@ struct ShmCompletionEvent {
 Bool isShmCompletion(Display*,XEvent* event,XPointer arg){
     return event->type==*reinterpret_cast<const int*>(arg);
 }
-constexpr int Bar=38, InitialW=1050, InitialH=720, Controls=10;
-constexpr int MenuRowH=32, StatusH=30;
+constexpr int Bar=80, InitialW=1240, InitialH=900, Controls=10;
+constexpr int MenuRowH=42, StatusH=64;
 constexpr double FrameDuration=1232.0*228.0/16777216.0;
 const char* const inputNames[Controls]={"A","B","Select","Start","Right","Left","Up","Down","R","L"};
 std::string keyName(KeySym k){ const char* s=XKeysymToString(k);return s?s:"Unassigned"; }
@@ -247,20 +247,31 @@ class App {
     static Item branch(std::string text,int sub){return {std::move(text),0,sub,false};}
     static Item separator(){return {"",0,0,true};}
     void buildMenus(){
+        // CP93 navigation order, preserving all actions from the newer core.
         menus_={
-            {"File",{action("Load ROM...",LoadRom),action("Load BIOS...",LoadBios),action("Reset ROM",ResetRom),separator(),action("Quit",Quit)}},
-            {"Input",{branch("GBA Controller",2)}},
-            {"Configure",{action("Controller Input",InputConfig),action("Record With Toast",RecordToast),
-                action("Record With Timer",RecordTimer),action("Custom AVI Output Location...",CustomVideoDir),branch("Emulator Speed",4)}},
-            {"System",{action("Full Screen",FullScreen),action("Full Screen (Stretched)",FullScreenStretch),
-                action("Windowed",Windowed),action("Pause / Resume",Pause),separator(),action("Mute",Mute),branch("APU",5),
-                action("Save State",SaveState),action("Load State",LoadState),branch("Save State Slot",6),
-                action("Screenshot",Screenshot),separator(),action("Record AVI",RecordVideo),action("Stop Recording",StopVideo)}},
-            {"TAS",{action("Record Inputs",TasRecord),action("Stop Recording Inputs",TasStop),
-                action("View Recorded Inputs",TasPlayback),action("Stop Viewing Inputs",TasPlaybackStop),
-                action("Reset Before Input Recording",TasReset)}},
-            {"Cheats",{action("Configure GBA Cheat Codes",CheatsConfig),action("Enable Cheats",CheatsEnabled)}},
-            {"Help",{action("Info",Info)}}
+            {"Library",{action("Open GBA ROM / ZIP...",LoadRom),
+                action("Import GBA BIOS...",LoadBios),action("Reset current game",ResetRom),
+                separator(),action("Quit CipherGBA",Quit)}},
+            {"Settings",{action("Input settings...",InputConfig),
+                branch("Emulator speed",4),separator(),
+                action("Record With Toast",RecordToast),
+                action("Record With Timer",RecordTimer),
+                action("Custom AVI Output Folder...",CustomVideoDir)}},
+            {"System",{action("Fullscreen aspect",FullScreen),
+                action("Fullscreen stretched",FullScreenStretch),
+                action("Windowed",Windowed),action("Pause / Resume",Pause),
+                action("Mute audio",Mute),branch("GBA APU Channels",5),
+                action("Save State",SaveState),action("Load State",LoadState),
+                branch("Save State Slot",6),action("Screenshot PNG",Screenshot),
+                action("Start AVI Recording",RecordVideo),action("Stop AVI Recording",StopVideo)}},
+            {"TAS",{action("Record inputs",TasRecord),
+                action("Stop / Save recording",TasStop),
+                action("Play recorded inputs",TasPlayback),
+                action("Stop playback",TasPlaybackStop),
+                action("Reset before input recording",TasReset)}},
+            {"Cheats",{action("Open cheat lab...",CheatsConfig),
+                action("Enable GBA cheats",CheatsEnabled)}},
+            {"Info",{action("About CipherGBA",Info)}}
         };
     }
     std::vector<Item> submenuItems(int id)const{
@@ -388,8 +399,14 @@ class App {
     }
     void stopAvi(){if(!avi_.active())return;avi_.stop();if(recordToast_)notice("AVI SAVED");}
     int textWidth(const std::string& s)const{return font_?XTextWidth(font_,s.c_str(),int(s.size())):int(s.size())*9;}
-    int rootWidth(unsigned idx)const{return textWidth(menus_[idx].title)+36;}
-    int rootX(unsigned idx)const{int x=0;for(unsigned i=0;i<idx;++i)x+=rootWidth(i);return x;}
+    int rootWidth(unsigned idx)const{
+        constexpr int widths[]={99,106,100,76,102,89};
+        return widths[std::min(idx,5u)];
+    }
+    int rootX(unsigned idx)const{
+        constexpr int starts[]={225,330,442,548,630,738};
+        return starts[std::min(idx,5u)];
+    }
     int dropdownWidth(int which)const{int n=260;for(const auto& i:menus_[which].items)n=std::max(n,textWidth(i.text)+73);return n;}
     bool itemChecked(int cmd)const{
         if(cmd==Mute)return muted_;
@@ -438,7 +455,7 @@ public:
         font_=XLoadQueryFont(dpy_,"-*-helvetica-bold-r-normal--18-*-*-*-*-*-iso8859-1");
         if(!font_)font_=XLoadQueryFont(dpy_,"9x15");
         if(font_)XSetFont(dpy_,gc_,font_->fid);
-        XSizeHints sh{};sh.flags=PMinSize;sh.min_width=730;sh.min_height=540;XSetWMNormalHints(dpy_,win_,&sh);
+        XSizeHints sh{};sh.flags=PMinSize;sh.min_width=950;sh.min_height=770;XSetWMNormalHints(dpy_,win_,&sh);
         XkbSetDetectableAutoRepeat(dpy_,True,nullptr);XMapWindow(dpy_,win_);resize(w_,h_);
         for(int i=1;i<argc;++i){const std::string a=argv[i];
             if(a=="--rom"&&i+1<argc)loadRom(argv[++i]);
@@ -728,8 +745,39 @@ private:
     void resize(int w,int h){w_=std::max(1,w);h_=std::max(1,h);if(back_)XFreePixmap(dpy_,back_);
         back_=XCreatePixmap(dpy_,win_,unsigned(w_),unsigned(h_),unsigned(DefaultDepth(dpy_,DefaultScreen(dpy_))));dirty_=true;}
     bool barVisible()const{return !fullscreen_||showMenuInFullscreen_||menu_>=0||my_<Bar;}
+    void drawNoRomDashboard(){
+        // CP93 two-column startup dashboard, never the branding logo.
+        const int margin=std::max(32,(w_-1100)/2),gap=24;
+        const int area=w_-2*margin;
+        const int left=std::max(480,(area-gap)*57/100);
+        const int rx=margin+left+gap,right=area-gap-left;
+        const int top=Bar+45,cardH=std::min(575,h_-Bar-StatusH-70);
+        rect(margin,top,left,cardH,0x142536);stroke(margin,top,left,cardH,0x426b8d);
+        rect(rx,top,right,cardH,0x122135);stroke(rx,top,right,cardH,0x426b8d);
+        rect(margin+28,top+31,60,4,0x66c4ff);
+        label(margin+28,top+73,"HODGKINSSTUDIOS / GAME BOY ADVANCE",0xffd65c);
+        label(margin+28,top+137,"CipherGBA",0x66c4ff);
+        label(margin+28,top+176,"YOUR GBA LIBRARY",0xf1f6fc);
+        label(margin+28,top+219,"A precise Game Boy Advance experience",0xc0d7e8);
+        label(margin+28,top+246,"with the tools you need to play.",0xc0d7e8);
+        button(margin+28,top+285,left-56,58,"Open ROM (.gba / .zip)",true);
+        const int half=(left-69)/2;
+        button(margin+28,top+360,half,53,"Import BIOS");
+        button(margin+41+half,top+360,half,53,"Configure Input");
+        rect(margin+28,top+449,left-56,1,0x486984);
+        label(margin+28,top+482,
+              core_.biosLoaded()?"ORIGINAL BIOS INSTALLED":"HLE MODE ACTIVE",0x9cdbc5);
+        label(rx+25,top+73,"EMU SYSTEM / STATUS",0x66c4ff);
+        const char* features[]={"ARM7TDMI emulation","GBA audio and video",
+            "ROM and ZIP loading","Save states and cheat codes",
+            "TAS movies and AVI capture","Auto gamepad support"};
+        for(int i=0;i<6;++i){
+            rect(rx+25,top+116+i*59,right-50,44,0x1c364a);
+            label(rx+37,top+144+i*59,features[i],0xe4edfa);
+        }
+    }
     void renderFrame(){
-        if(!core_.cartridge().loaded())return;
+        if(!core_.cartridge().loaded()){drawNoRomDashboard();return;}
         constexpr int srcW=GbaCore::Width,srcH=GbaCore::Height;
         const bool bar=barVisible();const int top=bar?Bar:0;
         const int contentH=h_-top-(fullscreen_?0:StatusH);
@@ -804,11 +852,28 @@ private:
     }
     void renderMenus(){
         if(!barVisible())return;
-        rect(0,0,w_,Bar,0x182330);rect(0,Bar-1,w_,1,0x486988);
+        rect(0,0,w_,Bar,0x112034);
+        rect(0,Bar-2,w_,2,0x466d91);
+        rect(19,17,38,38,0x236d9f);stroke(19,17,38,38,0x7ed2ff);
+        label(32,43,"G",0xffffff);
+        label(68,33,"CipherGBA",0x66c4ff);
+        label(69,51,"HODGKINS",0xffd65c);
+        rect(208,16,1,40,0x486984);
         for(unsigned i=0;i<menus_.size();i++){
             const int x=rootX(i),width=rootWidth(i);
-            if(menu_==int(i)||(mx_>=x&&mx_<x+width&&my_<Bar))rect(x,0,width,Bar,menu_==int(i)?0x2d4c6d:0x22405e);
-            label(x+17,Bar-13,menus_[i].title,0xeef3f8);
+            if(menu_==int(i)||(mx_>=x&&mx_<x+width&&my_<Bar)){
+                rect(x,13,width,46,menu_==int(i)?0x275b82:0x22405e);
+                rect(x+12,57,width-24,2,0x66c4ff);
+            }
+            label(x+13,40,menus_[i].title,0xeef3f8);
+        }
+        if(w_>=1060){
+            const int right=w_-20;
+            rect(right-304,22,92,29,0x1a423e);
+            label(right-292,41,core_.biosLoaded()?"REAL BIOS":"HLE",0xa9dbc5);
+            button(right-202,17,49,38,"PNG");
+            button(right-147,17,147,38,
+                core_.cartridge().loaded()?(paused_?"RESUME":"PAUSE"):"OPEN ROM",true);
         }
         if(menu_<0||menu_>=int(menus_.size()))return;
         const auto& items=menus_[menu_].items;const int x=rootX(menu_),width=dropdownWidth(menu_);
@@ -1027,6 +1092,19 @@ private:
             }
         }
         menu_=submenu_=-1;dirty_=true;
+        if(panel_==Game&&!core_.cartridge().loaded()){
+            const int margin=std::max(32,(w_-1100)/2);
+            const int gap=24,area=w_-2*margin;
+            const int left=std::max(480,(area-gap)*57/100);
+            const int top=Bar+45,half=(left-69)/2;
+            if(x>=margin+28&&x<margin+left-28){
+                if(y>=top+285&&y<top+343)execute(LoadRom);
+                else if(y>=top+360&&y<top+413){
+                    if(x<margin+28+half)execute(LoadBios);
+                    else if(x>=margin+41+half)execute(InputConfig);
+                }
+            }
+        }
     }
     void motion(int x,int y){
         mx_=x;my_=y;
