@@ -1,28 +1,28 @@
-# CipherGBA v0.2.0 — CP93 desktop frontend restoration
+# CipherGBA v0.3.0 — original Linux v0.1 frontend across all platforms
 
-**HodgkinsStudios · Release `v0.2.0`**
+**HodgkinsStudios · GitHub release `v0.3.0`**
 
-CipherGBA v0.2 restores the finished CP93-style desktop presentation for the existing, newer C++17 GBA emulator core. All emulator hardware code in `CipherGBA_Core` remains unchanged from the preceding main branch.
+## Corrected frontend
 
-## Desktop experience
+The v0.3 release restores the **Linux UI from the actual CipherGBA v0.1.0 source archive**, rather than the different CP93 dashboard introduced in v0.2. The v0.1 interface is now the design reference on native Linux X11, Windows x64, macOS arm64/x86_64, and SDL2 Linux packages.
 
-- **Library / Settings / System / TAS / Cheats / Info** navigation across the native Linux X11 and portable SDL2 implementations.
-- Two-column GBA Library startup dashboard with functioning Open ROM, Import BIOS, and Configure Input actions. The project logo remains in the README, desktop icon and About dialog rather than replacing the emulator window.
-- Dedicated keyboard/gamepad binding screens for the **ten standard GBA buttons**, with Save, Reset Defaults and Return. SDL2 can read the previous V1/V2 input-map formats without using obsolete auxiliary bindings.
-- Dedicated cheat management pages and accessible TAS, audio channel, save-state, screenshots, AVI capture and fullscreen controls; native dialog implementations vary by operating system.
-- Normal and reduced-speed settings only. No accelerated-play or rewind controls are presented.
-- Updated app metadata, About versions, platform documentation and headless no-ROM UI regression test.
+- Original seven-item **File / Input / Configure / System / TAS / Cheats / Help** menubar, 38px title/menu chrome, compact 30px status strip, and blank dark viewport before loading a game.
+- Matching dropdown text, nested GBA Controller, Emulator Speed, audio APU and save-state slot menus, separators and check marks.
+- In-window controller input mapping, cheat code editing and branded About panel across X11 and SDL2.
+- Preserved windowed, fullscreen, stretched display, ROM loading, BIOS import, screenshots, saves, audio controls, TAS and AVI features.
+- Fast-forward and rewind controls are intentionally **not** exposed.
+- Application logo remains in platform icons, README and About—not in the emulator's main screen.
 
-## Supported packages
+The newer Game Boy Advance emulator core in `CipherGBA_Core/` is **unchanged**. The old v0.1 source is used as a frontend design reference only.
 
-Windows x64, macOS arm64, macOS Intel x86_64, Linux native X11 x86_64, Linux AppImage and Flatpak x86_64, plus full source and combined all-platform ZIP. Release assets are assembled exclusively from a successful, exact-commit cross-platform CI run with SHA-256 checks.
+## Downloads
 
-## Accuracy and scope
+Windows x64, macOS Intel/Apple Silicon, Linux native X11, Linux AppImage and Flatpak, full C++17 source, combined all-platform archive and SHA-256 manifest. Every binary is built and packaged from the same validated GitHub `main` commit.
 
-The previously recorded 6,994/6,998 suite baseline in each BIOS mode remains the documented reference, not a new retest or guarantee. The four HBlank-related differences remain unresolved. This is a **frontend and packaging release**, not an emulator-core accuracy change.
+## Tests and known limitations
 
-CI compilation, packaging and synthetic smoke checks are not proof of interactive GUI, audio and controller behavior on every real device. See [platform acceptance](docs/PLATFORM_ACCEPTANCE.md) and [restoration notes](docs/FRONTEND_CP93.md). No Nintendo BIOS or game ROMs are included.
+Automated platform CI compiles the packages and runs headless ROM/startup, persistence, AV and other selected smoke tests. Real-device visual verification, keyboard/gamepad sessions, audio consistency and file-picker behavior across every OS still require manual acceptance.
 
-## Upgrade
+The historical suite accuracy baseline remains **6,994/6,998 in each BIOS mode**; four HBlank assertions are unresolved. v0.3 makes no new accuracy or full-speed claims.
 
-Version 0.1.0 remains available as a historical release. Existing cartridge saves are not overwritten by the optional SDL2 data importer. See [README](README.md) and [platform documentation](docs/PLATFORMS.md) for installation, data locations and build instructions.
+No Nintendo ROMs or BIOS files are shipped. macOS builds are ad-hoc signed, not notarized. See [README](README.md), [frontend reference](docs/FRONTEND_CLASSIC_V01.md) and [platform checklist](docs/PLATFORM_ACCEPTANCE.md).

@@ -1,6 +1,6 @@
 # Development and optimization priorities
 
-CipherGBA v0.1 aims for native GBA timing (approximately 59.73 emulated frames per second) while preserving deterministic CPU/PPU/APU behavior, accurate battery saves and platform portability. **Sustained full-speed gameplay on every target machine has not been established.**
+CipherGBA aims for native GBA timing (approximately 59.73 emulated frames per second) while preserving deterministic CPU/PPU/APU behavior, accurate battery saves and platform portability. **Sustained full-speed gameplay on every target machine has not been established.**
 
 | Area | Implementation | Verification still needed |
 | --- | --- | --- |

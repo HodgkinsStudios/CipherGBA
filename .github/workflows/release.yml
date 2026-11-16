@@ -1,16 +1,16 @@
-name: Publish CipherGBA v0.2
+name: Publish CipherGBA v0.3
 
 # Publish only after a successful exact-main-commit full-platform CI run.
 # Existing versions are immutable. A manual dispatch can retry failed publishing.
 on:
   workflow_dispatch:
   workflow_run:
-    workflows: ["v0.2 portability builds"]
+    workflows: ["v0.3 portability builds"]
     types: [completed]
     branches: [main]
 
 concurrency:
-  group: ciphergba-release-v0.2.0
+  group: ciphergba-release-v0.3.0
   cancel-in-progress: false
 
 jobs:
@@ -51,29 +51,29 @@ jobs:
         run: |
           mkdir -p dist
           gh run download "${{ steps.candidate.outputs.id }}" -R "$GITHUB_REPOSITORY" \
-            --name CipherGBA-v0.2-RELEASE-ASSETS --dir dist
+            --name CipherGBA-v0.3-RELEASE-ASSETS --dir dist
       - name: Check checksums and all required builds
         run: |
           cd dist
           sha256sum --check SHA256SUMS.txt
-          test -s CipherGBA-v0.2-ALL-PLATFORMS.zip
-          test -s CipherGBA-v0.2-Windows-x64.zip
-          test -s CipherGBA-v0.2-Linux-X11-x86_64.zip
-          test -s CipherGBA-v0.2-Linux-x86_64.AppImage
-          test -s CipherGBA-v0.2-Linux-x86_64.flatpak
-          test -s CipherGBA-v0.2-macOS-arm64.zip
-          test -s CipherGBA-v0.2-macOS-x86_64.zip
-          test -s CipherGBA-v0.2-Source.zip
-      - name: Publish immutable GitHub release v0.2.0
+          test -s CipherGBA-v0.3-ALL-PLATFORMS.zip
+          test -s CipherGBA-v0.3-Windows-x64.zip
+          test -s CipherGBA-v0.3-Linux-X11-x86_64.zip
+          test -s CipherGBA-v0.3-Linux-x86_64.AppImage
+          test -s CipherGBA-v0.3-Linux-x86_64.flatpak
+          test -s CipherGBA-v0.3-macOS-arm64.zip
+          test -s CipherGBA-v0.3-macOS-x86_64.zip
+          test -s CipherGBA-v0.3-Source.zip
+      - name: Publish immutable GitHub release v0.3.0
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view v0.2.0 -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo 'v0.2.0 already exists; refusing to overwrite release assets' >&2
+          if gh release view v0.3.0 -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'v0.3.0 already exists; refusing to overwrite release assets' >&2
             exit 1
           fi
-          gh release create v0.2.0 dist/* -R "$GITHUB_REPOSITORY" \
-            --target "$GITHUB_SHA" --title 'CipherGBA v0.2' \
+          gh release create v0.3.0 dist/* -R "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" --title 'CipherGBA v0.3' \
             --notes-file RELEASE_NOTES.md
-          gh release view v0.2.0 -R "$GITHUB_REPOSITORY" \
+          gh release view v0.3.0 -R "$GITHUB_REPOSITORY" \
             --json tagName,url,assets --jq '{tag: .tagName, url: .url, files: [.assets[].name]}'

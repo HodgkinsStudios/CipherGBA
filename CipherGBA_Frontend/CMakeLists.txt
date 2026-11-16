@@ -1,4 +1,4 @@
-# CipherGBA v0.2 -- preserve the original Linux X11 frontend and add SDL2.
+# CipherGBA v0.3 -- preserve the original Linux X11 frontend and add SDL2.
 # Generate one embedded icon source for the Linux WM icon, SDL2 window icon
 # and every platform's About view. Never use artwork as a startup splash.
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
@@ -75,8 +75,8 @@ elseif(CIPHERGBA_SELECTED_FRONTEND STREQUAL "SDL2")
             MACOSX_BUNDLE_GUI_IDENTIFIER "io.github.hodgkinsstudios.CipherGBA"
             MACOSX_BUNDLE_BUNDLE_NAME "CipherGBA"
             MACOSX_BUNDLE_ICON_FILE "CipherGBA.icns"
-            MACOSX_BUNDLE_SHORT_VERSION_STRING "0.2.0"
-            MACOSX_BUNDLE_BUNDLE_VERSION "0.2.0")
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "0.3.0"
+            MACOSX_BUNDLE_BUNDLE_VERSION "0.3.0")
     elseif(WIN32)
         target_link_libraries(CipherGBA PRIVATE comdlg32)
     endif()

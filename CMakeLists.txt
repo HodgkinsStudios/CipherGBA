@@ -1,6 +1,6 @@
-# CipherGBA v0.2 frontend release: portable core, selectable desktop frontends.
+# CipherGBA v0.3 classic frontend release: portable core, selectable desktop frontends.
 cmake_minimum_required(VERSION 3.16)
-project(CipherGBA VERSION 0.2.0 LANGUAGES C CXX)
+project(CipherGBA VERSION 0.3.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 option(PIXELGBA_ENABLE_LTO "Enable link-time optimization in Release builds" ON)

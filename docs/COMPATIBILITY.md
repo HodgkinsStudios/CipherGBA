@@ -1,6 +1,6 @@
 # Compatibility and real-game testing
 
-Game Boy Advance software uses a wide range of CPU/PPU/APU behaviors, cartridge save types and peripheral features. **No comprehensive per-title compatibility certification is currently included in the v0.1 source release.** A successful ROM load or a short headless boot does not establish full playability.
+Game Boy Advance software uses a wide range of CPU/PPU/APU behaviors, cartridge save types and peripheral features. **No comprehensive per-title compatibility certification is currently included in the v0.3 source release.** A successful ROM load or a short headless boot does not establish full playability.
 
 The portable SDL2 frontend supports a `--smoke-frames N` argument to execute a fixed number of emulated frames using a supplied ROM. For an initial local test with an owned game:
 
