@@ -1,4 +1,4 @@
-# CipherGBA v0.1 — Platform validation checklist
+# CipherGBA — v0.2 frontend platform validation checklist
 
 This document separates automated project checks from **manual testing still required**. The workflow only becomes evidence for a particular release commit after the corresponding GitHub Actions run completes successfully on `main`.
 
@@ -15,6 +15,9 @@ The 6,998-case private GBA test suite is **not** included in GitHub Actions and 
 ## Manual release acceptance on each target OS
 
 - [ ] Run the distributed application on a clean machine without a build toolchain; verify application icon and About branding.
+- [ ] Verify the CP93-style Library / Settings / System / TAS / Cheats / Info menus, two-column no-ROM dashboard, clickable Open ROM/BIOS/Input buttons, and no full-screen logo replacement.
+- [ ] Verify in-window keyboard/gamepad input remapping and cheat management; close and reopen the screens without losing emulator state.
+- [ ] Confirm that fullscreen hides desktop chrome and that moving the pointer to the top reveals the menu.
 - [ ] Load a legally obtained `.gba` and a supported `.zip`, with both HLE and (if available) original BIOS.
 - [ ] Play long enough to check video scaling, audio stability, controller connection/reconnection and mapping persistence.
 - [ ] Toggle fullscreen/windowed, pause/mute/fast-forward; check keyboard and native file dialogs.
