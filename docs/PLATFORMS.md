@@ -1,6 +1,6 @@
-# Platforms and frontend differences
+# Platforms, CP93 interface, and frontend differences
 
-CipherGBA v0.1 maintains two desktop frontends on top of the same C++17 emulation core.
+CipherGBA maintains two desktop frontend implementations over its current C++17 emulation core, with the CP93 navigation/dashboard design being restored for the planned v0.2 release. No CP93 core sources replace the current core.
 
 | Target | Frontend | Build/package | Remaining validation |
 | --- | --- | --- | --- |
@@ -11,7 +11,7 @@ CipherGBA v0.1 maintains two desktop frontends on top of the same C++17 emulatio
 | macOS arm64 | SDL2 | `.app` bundle in ZIP | Real-machine UI/audio/controller; notarization not provided |
 | macOS x86_64 | SDL2 | `.app` bundle in ZIP | Real-machine UI/audio/controller; notarization not provided |
 
-The X11 interface preserves native Linux menus and detailed controls. SDL2 presents a visible, clickable **File / System / Config / Help** menu bar in its main window, with native file-picker integrations where supported. The menu bar hides automatically during fullscreen gameplay unless the pointer moves to the top; F1 also opens the legacy menu dialog. With no ROM loaded, the SDL2 window shows a text-only Open ROM prompt, never a large logo image. The artwork remains in the application icon and About view. Some presentation and configuration options differ. Both use the same shared emulation source; Linux X11 links a shared core, while SDL2 links the optional core static target. Build recipes and package verification can be reviewed in [portability.yml](../.github/workflows/portability.yml).
+The X11 and SDL2 frontends now expose the CP93 six-tab navigation: **Library, Settings, System, TAS, Cheats, Info**. Each opens a real clickable menu. At startup, a two-column library dashboard offers Open ROM, Import BIOS, and Configure Input; the screen is not covered by an application logo. Native X11 uses Xlib for rendering, while Windows/macOS/portable Linux use an SDL2 implementation with platform file dialogs. Both expose in-window input and cheat management, although some editing workflows and advanced controls differ. SDL2's F1 fallback opens its legacy SDL dialog menu. Fullscreen gameplay hides the desktop chrome until the pointer reaches the top, and artwork appears only in icons and About views. Linux X11 links the shared core; SDL2 links the static core built from the same current sources. See [the restoration notes](FRONTEND_CP93.md) and [cross-platform CI](../.github/workflows/portability.yml).
 
 ## Data and migration
 
