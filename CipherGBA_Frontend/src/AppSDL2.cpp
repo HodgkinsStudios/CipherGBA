@@ -1095,7 +1095,7 @@ struct Application {
 void help(){
     std::puts("CipherGBA v0.3 (SDL2 frontend)");
     std::puts("Usage: CipherGBA [--rom PATH] [--bios PATH] [--import-data DIR] [--verify-rom PATH] [--smoke-frames N] [--ui-smoke-frames N] [--help] [--version]");
-    std::puts("F1: Library menu. Ctrl+O: Open ROM; Ctrl+B: Import BIOS; Ctrl+I: Input remap.");
+    std::puts("F1: File menu. Ctrl+O: Open ROM; Ctrl+B: Import BIOS; Ctrl+I: Input remap.");
     std::puts("Controls: Z=A X=B Backspace=Select Enter=Start Arrows=D-pad A=L S=R");
     std::puts("F2 Reset, F3 TAS, F4 Mute, F5 Save, F6 Slot, F7 Pause, F8 Load, F9 PNG");
     std::puts("F10 Stretch, F11/Escape Fullscreen, F12 AVI record.");
