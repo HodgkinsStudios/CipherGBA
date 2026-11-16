@@ -29,6 +29,24 @@ def main():
     check('kAboutArtwork' not in render,'About artwork must never replace the main UI')
     check('app.mainMenu();' not in sdl.split('int main(int argc,char** argv){',1)[1],
           'Main window startup must not hide behind a modal popup')
+    x11=(ROOT/'CipherGBA_Frontend/src/AppX11.cpp').read_text(encoding='utf-8')
+    for section in ('LIBRARY','SETTINGS','SYSTEM','TAS','CHEATS','INFO'):
+        check(section in sdl, 'Missing CP93 SDL2 section: '+section)
+    for section in ('"Library"','"Settings"','"System"','"TAS"','"Cheats"','"Info"'):
+        check(section in x11, 'Missing CP93 X11 section: '+section)
+    for name in ('uiDrawInput','uiDrawCheats','uiPanelClick','uiDrawNoRom'):
+        check(name in sdl,'Missing portable full frontend component: '+name)
+    check('void drawNoRomDashboard()' in x11,'Native frontend lacks CP93 no-ROM dashboard')
+    for frontend in (sdl,x11):
+        check('fastForward_' not in frontend and 'fastKey_' not in frontend,
+              'Accelerated playback input unexpectedly returned')
+        check('200% DOUBLE SPEED' not in frontend,
+              'Unsupported accelerated playback menu returned')
+    check('CipherGBA v0.2.0' in sdl and 'CipherGBA v0.2.0' in x11,
+          'Version metadata missing in frontend')
+
+    check('SDL_SetWindowIcon(window,icon)' in sdl,'Application window icon missing')
+    check('void about()' in sdl and 'kAboutArtwork' in sdl,'Logo absent from About')
     for old in ('ciphergba_logo.png','ciphergba_readme_banner.png'):
         check(not (ROOT/'assets/branding'/old).exists(),'Old branding asset retained: '+old)
         check(old not in readme,'README references retired branding: '+old)

@@ -137,11 +137,11 @@ struct Application {
         if(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_GAMECONTROLLER)!=0){
             errorMessage(nullptr,SDL_GetError());return false;
         }
-        window=SDL_CreateWindow("CipherGBA v0.1 - F1 Menu | Ctrl+O Open ROM",
-            SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,720,480,
+        window=SDL_CreateWindow("CipherGBA v0.2 - F1 Menu | Ctrl+O Open ROM",
+            SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,1240,900,
             SDL_WINDOW_RESIZABLE|SDL_WINDOW_ALLOW_HIGHDPI);
         if(!window){errorMessage(nullptr,SDL_GetError());return false;}
-        SDL_SetWindowMinimumSize(window,560,360);
+        SDL_SetWindowMinimumSize(window,950,770);
         renderer=SDL_CreateRenderer(window,-1,SDL_RENDERER_ACCELERATED|SDL_RENDERER_PRESENTVSYNC);
         if(!renderer)renderer=SDL_CreateRenderer(window,-1,SDL_RENDERER_SOFTWARE);
         if(!renderer){errorMessage(window,SDL_GetError());return false;}
@@ -264,10 +264,10 @@ struct Application {
         core.clearRomCheatPatches();
         loadCheats();
         cheatsEnabled_=false;
-        paused=false;
+        paused=false;uiPanel_=UiPanel::Game;
         if(audio)SDL_ClearQueuedAudio(audio);
         frameDeadline=std::chrono::steady_clock::now();
-        SDL_SetWindowTitle(window,("CipherGBA v0.1 - "+romName).c_str());
+        SDL_SetWindowTitle(window,("CipherGBA v0.2 - "+romName).c_str());
         return true;
     }
     bool loadBios(const fs::path& file){
@@ -330,6 +330,7 @@ struct Application {
         if(ec){message("Cannot create input configuration directory: "+ec.message());return false;}
         std::ofstream out(bindingsFile(),std::ios::trunc);
         if(!out){message("Cannot open input configuration for writing");return false;}
+        // Persist only the ten GBA controls; accept legacy V2 files on load.
         out<<"CipherGBA_SDL_INPUT_V1\n";
         for(unsigned i=0;i<10;i++)
             out<<static_cast<int>(keyMap_[i])<<' '<<static_cast<int>(padMap_[i])<<'\n';
@@ -341,7 +342,7 @@ struct Application {
         std::ifstream in(bindingsFile());
         if(!in)return;
         std::string magic;
-        if(!(in>>magic)||magic!="CipherGBA_SDL_INPUT_V1")return;
+        if(!(in>>magic) || (magic!="CipherGBA_SDL_INPUT_V1" && magic!="CipherGBA_SDL_INPUT_V2"))return;
         KeyMap newKeys=defaultKeys_;
         PadMap newPad=defaultPad_;
         for(unsigned i=0;i<10;i++){
@@ -351,6 +352,7 @@ struct Application {
             newKeys[i]=static_cast<SDL_Scancode>(key);
             newPad[i]=static_cast<SDL_GameControllerButton>(pad);
         }
+        // Ignore V2's removed eleventh host action; preserve all ten GBA bindings.
         keyMap_=newKeys;padMap_=newPad;
     }
     void mappingTitle(){
@@ -413,6 +415,10 @@ struct Application {
         }
     }
     void finishMapping(){
+        if(uiCaptureSingle_){
+            uiCaptureSingle_=false;remap_=RemapMode::None;
+            return;
+        }
         ++remapIndex_;
         if(remapIndex_>=10){
             remap_=RemapMode::None;
@@ -436,12 +442,12 @@ struct Application {
     void about(){
         const bool oldPaused=paused;
         paused=true;
-        SDL_Window* dialog=SDL_CreateWindow("About CipherGBA v0.1 | HodgkinsStudios",
+        SDL_Window* dialog=SDL_CreateWindow("About CipherGBA v0.2 | HodgkinsStudios",
             SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,640,740,
             SDL_WINDOW_RESIZABLE|SDL_WINDOW_ALLOW_HIGHDPI);
         if(!dialog){
             SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION,"About CipherGBA",
-                "CipherGBA v0.1.0 | HodgkinsStudios\nGame Boy Advance Emulator | C++17",
+                "CipherGBA v0.2.0 | HodgkinsStudios\nGame Boy Advance Emulator | C++17",
                 window);
             paused=oldPaused;return;
         }
@@ -480,7 +486,7 @@ struct Application {
             SDL_Rect area{(w-size)/2,12,size,size};
             if(picture)SDL_RenderCopy(drawing,picture,nullptr,&area);
             const int y=12+size+18;
-            ciphergba_about::text(drawing,"CIPHERGBA V0.1.0",w/2,y,2);
+            ciphergba_about::text(drawing,"CIPHERGBA V0.2.0",w/2,y,2);
             ciphergba_about::text(drawing,"HODGKINSSTUDIOS",w/2,y+24,2,{200,157,255,255});
             ciphergba_about::text(drawing,"GAME BOY ADVANCE EMULATOR",w/2,y+48,2);
             ciphergba_about::text(drawing,"C++17 | HLE / ORIGINAL BIOS",w/2,y+72,2);
@@ -793,169 +799,434 @@ struct Application {
     }
 
 
-    // Persistent clickable menus for Windows, macOS, AppImage and Flatpak.
-    // Use the dependency-free bitmap font; the logo is reserved for About.
-    struct UiEntry {const char* label; int action;};
+
+    // CP93 desktop frontend design, reimplemented with SDL2 rendering.
+    // This keeps one C++17 frontend on Windows, Linux and macOS without
+    // linking the older CP93 core, and never paints the logo over the game.
+    enum class UiPanel { Game, Input, Cheats };
+    UiPanel uiPanel_=UiPanel::Game;
+    bool uiCaptureSingle_=false;
+    bool uiToast_=false, uiTimer_=false;
+    std::string uiToastMessage_;
+    std::chrono::steady_clock::time_point uiToastUntil_{};
+    int uiCheatScroll_=0;
+    int uiSubmenu_=0; // 1: speed, 2: APU mixer, 3: state slot
+
+    struct UiEntry {const char* label;int action;};
     std::vector<UiEntry> uiEntries(int tab) const {
         switch(tab){
-        case 0: return {{"OPEN ROM",1},{"IMPORT BIOS",2},{"SAVE STATE",3},
-                        {"LOAD STATE",4},{"SCREENSHOT",5},{"NEXT STATE SLOT",6},
-                        {"RESET ROM",7},{"QUIT",8}};
-        case 1: return {{"TOGGLE FULLSCREEN",9},{"WINDOWED",10},
-                        {"TOGGLE STRETCH",11},{"PAUSE OR RESUME",12},
-                        {"MUTE OR UNMUTE",13},{"CYCLE EMULATION SPEED",14},
-                        {"AUDIO CHANNELS",15}};
-        case 2: return {{"INPUT MAPPING",16},{"CHEAT CODES",17},
-                        {"TAS RECORDING",18}};
-        case 3: return {{"ABOUT CIPHERGBA",19}};
-        default: return {};
+        case 0:return {{"OPEN GBA ROM / ZIP",1},{"IMPORT GBA BIOS",2},
+                       {"RESET CURRENT GAME",7},{"SAVE CARTRIDGE DATA",20},{"EXIT CIPHERGBA",8}};
+        case 1:return {{"INPUT SETTINGS",16},{"EMULATOR SPEED",14},
+                       {"RECORD WITH TOAST",22},{"RECORD WITH TIMER",23},
+                       {"AUDIO CHANNELS",15}};
+        case 2:return {{"FULLSCREEN ASPECT",9},{"FULLSCREEN STRETCHED",24},
+                       {"WINDOWED",10},{"PAUSE OR RESUME",12},{"MUTE AUDIO",13},
+                       {"GBA APU CHANNELS",15},{"SAVE STATE",3},{"LOAD STATE",4},
+                       {"SAVE STATE SLOT",6},{"SCREENSHOT PNG",5},
+                       {"START OR STOP AVI",21}};
+        case 3:return {{"RECORD OR PLAY INPUTS",18},{"RECORDING OPTIONS",18}};
+        case 4:return {{"OPEN CHEAT LAB",17},{"ENABLE OR DISABLE CHEATS",25},
+                       {"RELOAD ROM CHEATS",26}};
+        case 5:return {{"ABOUT CIPHERGBA",19}};
+        default:return {};
         }
     }
-    int uiScale() const {
-        int ww=0,wh=0,rw=0,rh=0;
-        SDL_GetWindowSize(window,&ww,&wh);
+    int uiScale()const{
+        int ww=0,wh=0,rw=0,rh=0;SDL_GetWindowSize(window,&ww,&wh);
         SDL_GetRendererOutputSize(renderer,&rw,&rh);
         return std::clamp((rw+std::max(1,ww)/2)/std::max(1,ww),1,3);
     }
-    int uiBarHeight() const{return 38*uiScale();}
-    int uiStatusHeight() const{return 26*uiScale();}
-    bool uiChromeVisible() const {
-        return !fullscreen || uiMenu_>=0 || (uiMouseY_>=0 && uiMouseY_<uiBarHeight());
+    int uiBarHeight()const{return 80*uiScale();}
+    int uiStatusHeight()const{return 64*uiScale();}
+    int uiTabX(int i)const{
+        constexpr int pos[]={225,330,442,548,630,738};
+        return pos[std::clamp(i,0,5)]*uiScale();
     }
-    int uiTabAt(int x,int y) const {
-        const int scale=uiScale();
-        if(y<0 || y>=uiBarHeight())return -1;
-        const int left=12*scale, tabWidth=116*scale;
-        return x>=left && x<left+4*tabWidth ? (x-left)/tabWidth : -1;
+    int uiTabWidth(int i)const{
+        constexpr int sizes[]={99,106,100,76,102,89};
+        return sizes[std::clamp(i,0,5)]*uiScale();
     }
-    void uiMapMouse(int& x,int& y) const {
-        int ww=0,wh=0,rw=0,rh=0;
-        SDL_GetWindowSize(window,&ww,&wh);
+    bool uiChromeVisible()const{
+        return !fullscreen || uiPanel_!=UiPanel::Game || uiMenu_>=0 ||
+               (uiMouseY_>=0&&uiMouseY_<uiBarHeight());
+    }
+    int uiTabAt(int x,int y)const{
+        if(y<0||y>=uiBarHeight())return -1;
+        for(int i=0;i<6;++i)if(x>=uiTabX(i)&&x<uiTabX(i)+uiTabWidth(i))return i;
+        return -1;
+    }
+    void uiMapMouse(int& x,int& y)const{
+        int ww=0,wh=0,rw=0,rh=0;SDL_GetWindowSize(window,&ww,&wh);
         SDL_GetRendererOutputSize(renderer,&rw,&rh);
-        x=x*rw/std::max(1,ww);
-        y=y*rh/std::max(1,wh);
+        x=x*rw/std::max(1,ww);y=y*rh/std::max(1,wh);
     }
-    int uiPopupX(int tab,int screenWidth) const {
-        const int scale=uiScale();
-        return std::max(0,std::min((12+116*tab)*scale,screenWidth-300*scale));
+    int uiPopupX(int tab,int w)const{
+        return std::max(8*uiScale(),
+                 std::min(uiTabX(tab),w-390*uiScale()));
     }
-    int uiActionAt(int x,int y) const {
+    int uiPopupRow()const{return 42*uiScale();}
+    int uiActionAt(int x,int y)const{
         if(uiMenu_<0)return 0;
         int w=0,h=0;SDL_GetRendererOutputSize(renderer,&w,&h);
-        const int scale=uiScale(), left=uiPopupX(uiMenu_,w);
-        const int rowHeight=30*scale;
+        const int left=uiPopupX(uiMenu_,w),width=375*uiScale();
+        const int top=uiBarHeight()+8*uiScale(),row=uiPopupRow();
+        if(uiSubmenu_){
+            const int subLeft=uiSubmenuX(w),subTop=uiSubmenuY();
+            const int subRow=40*uiScale(),count=uiSubmenu_==1?4:uiSubmenu_==2?6:4;
+            if(x>=subLeft&&x<subLeft+270*uiScale()&&y>=subTop&&y<subTop+count*subRow){
+                const int index=(y-subTop)/subRow;
+                return (uiSubmenu_==1?101:uiSubmenu_==2?110:120)+index;
+            }
+        }
         const auto entries=uiEntries(uiMenu_);
-        if(x<left || x>=left+300*scale || y<uiBarHeight() ||
-           y>=uiBarHeight()+static_cast<int>(entries.size())*rowHeight)return 0;
-        return entries[static_cast<std::size_t>((y-uiBarHeight())/rowHeight)].action;
+        if(x<left||x>=left+width||y<top||
+           y>=top+static_cast<int>(entries.size())*row)return 0;
+        return entries[std::size_t((y-top)/row)].action;
+    }
+    int uiSubmenuX(int w)const{
+        const int sc=uiScale();
+        const int parentRight=uiPopupX(uiMenu_,w)+375*sc;
+        return parentRight+270*sc>w ? uiPopupX(uiMenu_,w)-270*sc:parentRight;
+    }
+    int uiSubmenuY()const{
+        int index=0;
+        if(uiSubmenu_==1)index=uiMenu_==1?1:0;
+        if(uiSubmenu_==2)index=uiMenu_==2?5:4;
+        if(uiSubmenu_==3)index=8;
+        return uiBarHeight()+8*uiScale()+index*uiPopupRow();
+    }
+    void uiOpenInput(){
+        oldKeyMap_=keyMap_;oldPadMap_=padMap_;
+        pausedBeforeInput_=paused;paused=true;
+        remap_=RemapMode::None;uiPanel_=UiPanel::Input;
+    }
+    void uiCloseInput(bool save){
+        if(save){
+            if(!saveBindings())return;
+        }else{
+            keyMap_=oldKeyMap_;padMap_=oldPadMap_;
+        }
+        remap_=RemapMode::None;uiCaptureSingle_=false;
+        uiPanel_=UiPanel::Game;paused=pausedBeforeInput_;
     }
     void uiAction(int command){
         switch(command){
-        case 1: chooseFile(false);break;
-        case 2: chooseFile(true);break;
-        case 3: saveState();break;
-        case 4: loadState();break;
-        case 5: screenshot();break;
-        case 6: stateSlot=stateSlot%4+1;break;
-        case 7: if(core.cartridge().loaded()){core.reset();if(audio)SDL_ClearQueuedAudio(audio);}break;
-        case 8: running=false;break;
-        case 9: toggleFullscreen();break;
-        case 10: if(fullscreen)toggleFullscreen();break;
-        case 11: stretched=!stretched;break;
-        case 12: paused=!paused;break;
-        case 13: muted=!muted;break;
-        case 14: speedPercent_=speedPercent_==100?50:speedPercent_==50?25:100;break;
-        case 15: audioChannelsMenu();break;
-        case 16: openInputMenu();break;
-        case 17: cheatMenu();break;
-        case 18: tasMenu();break;
-        case 19: about();break;
-        default: break;
+        case 1:chooseFile(false);uiPanel_=UiPanel::Game;break;
+        case 2:chooseFile(true);break;
+        case 3:saveState();break;
+        case 4:loadState();break;
+        case 5:screenshot();break;
+        case 6:stateSlot=stateSlot%4+1;break;
+        case 7:if(core.cartridge().loaded()){
+            core.reset();if(audio)SDL_ClearQueuedAudio(audio);
+        }break;
+        case 8:running=false;break;
+        case 9:if(!fullscreen)toggleFullscreen();stretched=false;break;
+        case 10:if(fullscreen)toggleFullscreen();break;
+        case 11:stretched=!stretched;break;
+        case 12:paused=!paused;break;
+        case 13:muted=!muted;break;
+        case 14:speedPercent_=speedPercent_==25?50:speedPercent_==50?75:speedPercent_==75?100:25;break;
+        case 15:audioChannelsMenu();break;
+        case 16:uiOpenInput();break;
+        case 17:uiPanel_=UiPanel::Cheats;break;
+        case 18:tasMenu();break;
+        case 19:about();break;
+        case 20:if(core.cartridge().loaded()){
+            std::string error;if(!core.flushSave(error)&&!error.empty())message(error);
+        }break;
+        case 21:{
+            const bool previouslyRecording=avi_.active();
+            if(toggleAvi()&&uiToast_){
+                uiToastMessage_=previouslyRecording?"AVI RECORDING SAVED":"AVI RECORDING STARTED";
+                uiToastUntil_=std::chrono::steady_clock::now()+std::chrono::seconds(3);
+            }
+            break;
+        }
+        case 22:uiToast_=!uiToast_;break;
+        case 23:uiTimer_=!uiTimer_;break;
+        case 24:if(!fullscreen)toggleFullscreen();stretched=true;break;
+        case 25:cheatsEnabled_=!cheatsEnabled_;break;
+        case 26:loadCheats();break;
+        case 101:speedPercent_=25;break;
+        case 102:speedPercent_=50;break;
+        case 103:speedPercent_=75;break;
+        case 104:speedPercent_=100;break;
+        case 120:case 121:case 122:case 123:stateSlot=command-119;break;
+        case 110:case 111:case 112:case 113:case 114:case 115:
+            core.setAudioChannelMask(core.audioChannelMask()^(1u<<(command-110)));break;
+        default:break;
         }
     }
-    void uiFill(int x,int y,int w,int h,SDL_Color c) {
+    void uiFill(int x,int y,int w,int h,SDL_Color c){
+        if(w<1||h<1)return;
         SDL_SetRenderDrawColor(renderer,c.r,c.g,c.b,c.a);
-        const SDL_Rect rectangle{x,y,w,h};
-        SDL_RenderFillRect(renderer,&rectangle);
+        SDL_Rect rect{x,y,w,h};SDL_RenderFillRect(renderer,&rect);
     }
-    void uiDrawChrome(int w,int h) {
+    void uiOutline(int x,int y,int w,int h,SDL_Color c){
+        if(w<1||h<1)return;
+        SDL_SetRenderDrawColor(renderer,c.r,c.g,c.b,c.a);
+        SDL_Rect rect{x,y,w,h};SDL_RenderDrawRect(renderer,&rect);
+    }
+    void uiText(const std::string& title,int x,int y,int scale=2,
+                SDL_Color color={226,236,250,255}){
+        std::string upper=title;
+        for(char& c:upper)c=static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+        ciphergba_about::text(renderer,upper,x,y,scale*uiScale(),color);
+    }
+    void uiButton(int x,int y,int w,int h,const std::string& title,bool primary=false){
+        const int sc=uiScale();x*=sc;y*=sc;w*=sc;h*=sc;
+        uiFill(x,y,w,h,primary?SDL_Color{35,109,159,255}:SDL_Color{31,59,81,255});
+        uiOutline(x,y,w,h,{114,170,214,255});
+        uiText(title,x+w/2,y+std::max(5*sc,(h-14*sc)/2),2);
+    }
+    bool uiWithin(int x,int y,int left,int top,int width,int height)const{
+        const int sc=uiScale();
+        return x>=left*sc&&y>=top*sc&&x<(left+width)*sc&&y<(top+height)*sc;
+    }
+    void uiDrawChrome(int w,int h){
         if(!uiChromeVisible())return;
-        const int scale=uiScale(), barHeight=uiBarHeight();
-        const int statusHeight=uiStatusHeight();
-        uiFill(0,0,w,barHeight,{31,39,54,255});
-        uiFill(0,barHeight-2*scale,w,2*scale,{67,91,122,255});
-        const char* tabs[]={"FILE","SYSTEM","CONFIG","HELP"};
-        for(int i=0;i<4;++i){
-            const int x=(12+116*i)*scale;
-            if(i==uiMenu_ || uiTabAt(uiMouseX_,uiMouseY_)==i)
-                uiFill(x,3*scale,116*scale,31*scale,
-                       i==uiMenu_?SDL_Color{68,102,145,255}:SDL_Color{45,61,82,255});
-            ciphergba_about::text(renderer,tabs[i],x+58*scale,11*scale,2*scale);
+        const int sc=uiScale(),bar=uiBarHeight(),status=uiStatusHeight();
+        uiFill(0,0,w,bar,{17,30,45,255});
+        uiFill(0,bar-2*sc,w,2*sc,{65,101,132,255});
+        uiFill(19*sc,17*sc,38*sc,38*sc,{35,109,159,255});
+        uiOutline(19*sc,17*sc,38*sc,38*sc,{126,210,255,255});
+        uiText("G",38*sc,28*sc,3);
+        uiText("CIPHERGBA",135*sc,19*sc,2,{102,196,255,255});
+        uiText("HODGKINS",135*sc,45*sc,1,{255,214,92,255});
+        const char* names[]={"LIBRARY","SETTINGS","SYSTEM","TAS","CHEATS","INFO"};
+        for(int i=0;i<6;++i){
+            const int x=uiTabX(i),tw=uiTabWidth(i);
+            if(uiMenu_==i||uiTabAt(uiMouseX_,uiMouseY_)==i){
+                uiFill(x,13*sc,tw,46*sc,{39,91,130,255});
+                uiFill(x+12*sc,57*sc,tw-24*sc,2*sc,{102,196,255,255});
+            }
+            uiText(names[i],x+tw/2,30*sc,1,{227,239,252,255});
         }
-        uiFill(0,h-statusHeight,w,statusHeight,{25,31,43,255});
-        uiFill(0,h-statusHeight,w,scale,{67,91,122,255});
-        const char* state=core.cartridge().loaded()?(paused?"PAUSED":"RUNNING"):"NO ROM LOADED";
-        ciphergba_about::text(renderer,
-            std::string("CIPHERGBA | ")+state,
-            std::min(w/2,160*scale),h-statusHeight+8*scale,scale,
-            {191,205,226,255});
-        if(w>=670*scale)
-            ciphergba_about::text(renderer,
-                "F1 MENU | ESC FULLSCREEN",w-150*scale,
-                h-statusHeight+8*scale,scale,{145,171,203,255});
+        if(w>1050*sc){
+            uiFill(w-324*sc,22*sc,90*sc,29*sc,{24,66,63,255});
+            uiText(core.biosLoaded()?"REAL BIOS":"HLE",w-279*sc,30*sc,1,{167,225,195,255});
+            uiFill(w-221*sc,17*sc,55*sc,38*sc,{28,62,89,255});
+            uiOutline(w-221*sc,17*sc,55*sc,38*sc,{86,137,174,255});
+            uiText("PNG",w-194*sc,30*sc,1);
+            uiFill(w-158*sc,17*sc,138*sc,38*sc,{35,109,159,255});
+            uiOutline(w-158*sc,17*sc,138*sc,38*sc,{126,210,255,255});
+            uiText(core.cartridge().loaded()?(paused?"RESUME":"PAUSE"):"OPEN ROM",
+                   w-89*sc,29*sc,1);
+        }
+        if(!fullscreen || uiPanel_!=UiPanel::Game){
+            uiFill(0,h-status,w,status,{10,20,33,255});
+            uiFill(0,h-status,w,sc,{64,103,139,255});
+            const std::string rom=core.cartridge().loaded()?romName:"NO ROM LOADED";
+            uiText(rom.substr(0,28),100*sc,h-44*sc,1,{205,224,240,255});
+            std::string stats="STATE "+std::to_string(stateSlot)+"  "+std::to_string(speedPercent_)+"%";
+            if(paused)stats+="  PAUSED";
+            if(muted)stats+="  MUTED";
+            if(avi_.active()){
+                stats+="  REC";
+                if(uiTimer_)stats+=" "+std::to_string(avi_.frames()/60u)+"S";
+            }
+            uiText(stats,w/2,h-44*sc,1,{255,211,118,255});
+            uiText("CIPHERGBA  |  HODGKINSSTUDIOS",w/2,h-20*sc,1,{129,164,193,255});
+        }
         if(uiMenu_<0)return;
         const auto entries=uiEntries(uiMenu_);
-        const int left=uiPopupX(uiMenu_,w), rowHeight=30*scale;
-        const int popupHeight=static_cast<int>(entries.size())*rowHeight;
-        uiFill(left,barHeight,300*scale,popupHeight+2*scale,{43,54,73,255});
-        uiFill(left,barHeight,scale,popupHeight,{91,117,152,255});
+        const int left=uiPopupX(uiMenu_,w),top=bar+8*sc,row=uiPopupRow();
+        const int height=int(entries.size())*row+16*sc,width=375*sc;
+        uiFill(left+6*sc,top+6*sc,width,height,{6,12,22,255});
+        uiFill(left,top,width,height,{20,37,54,255});
+        uiOutline(left,top,width,height,{82,121,155,255});
+        uiFill(left+14*sc,top,width-28*sc,2*sc,{102,196,255,255});
         for(std::size_t i=0;i<entries.size();++i){
-            const int y=barHeight+static_cast<int>(i)*rowHeight;
-            if(uiMouseX_>=left && uiMouseX_<left+300*scale &&
-               uiMouseY_>=y && uiMouseY_<y+rowHeight)
-                uiFill(left+2*scale,y,296*scale,rowHeight,{75,111,153,255});
-            ciphergba_about::text(renderer,entries[i].label,
-                left+150*scale,y+9*scale,2*scale,{239,245,255,255});
+            const int yy=top+int(i)*row;
+            if(uiMouseX_>=left && uiMouseX_<left+width &&
+               uiMouseY_>=yy && uiMouseY_<yy+row)
+                uiFill(left+7*sc,yy+1*sc,width-14*sc,row-2*sc,{39,91,130,255});
+            uiFill(left+16*sc,yy+17*sc,6*sc,6*sc,{81,125,164,255});
+            uiText(entries[i].label,left+width/2,yy+14*sc,1);
+            if(entries[i].action==6||entries[i].action==14||entries[i].action==15)
+                uiText(">",left+width-24*sc,yy+14*sc,1,{102,196,255,255});
+        }
+        if(uiSubmenu_){
+            const int subX=uiSubmenuX(w),subY=uiSubmenuY(),subRow=40*sc;
+            const int count=uiSubmenu_==1?4:uiSubmenu_==2?6:4;
+            uiFill(subX,subY,270*sc,count*subRow+8*sc,{31,55,76,255});
+            uiOutline(subX,subY,270*sc,count*subRow+8*sc,{113,162,200,255});
+            const char* speeds[]={"25% QUARTER SPEED","50% HALF SPEED","75% REDUCED SPEED",
+                                 "100% NORMAL SPEED"};
+            const char* channels[]={"SQUARE 1","SQUARE 2","WAVE","NOISE",
+                                    "DIRECT SOUND A","DIRECT SOUND B"};
+            for(int i=0;i<count;++i){
+                const int yy=subY+i*subRow;
+                bool checked=uiSubmenu_==1?speedPercent_==(i==0?25:i==1?50:i==2?75:100):
+                             uiSubmenu_==2?(core.audioChannelMask()&(1u<<i))!=0:
+                             stateSlot==i+1;
+                if(uiMouseX_>=subX&&uiMouseX_<subX+270*sc&&
+                   uiMouseY_>=yy&&uiMouseY_<yy+subRow)
+                    uiFill(subX+4*sc,yy+1*sc,262*sc,subRow-2*sc,{46,92,127,255});
+                uiFill(subX+15*sc,yy+14*sc,14*sc,14*sc,
+                       checked?SDL_Color{49,142,107,255}:SDL_Color{64,84,109,255});
+                const std::string label=uiSubmenu_==1?speeds[i]:
+                    uiSubmenu_==2?channels[i]:"SLOT "+std::to_string(i+1);
+                uiText(label,subX+146*sc,yy+13*sc,1);
+            }
         }
     }
-    void uiDrawNoRom(int w,int top,int bottom) {
-        const int scale=uiScale();
-        const int middle=top+(bottom-top)/2;
-        ciphergba_about::text(renderer,"CIPHERGBA",w/2,
-                              middle-65*scale,4*scale,{224,235,255,255});
-        ciphergba_about::text(renderer,"GAME BOY ADVANCE EMULATOR",w/2,
-                              middle-17*scale,2*scale,{166,185,212,255});
-        ciphergba_about::text(renderer,"NO GAME LOADED",w/2,
-                              middle+22*scale,2*scale,{228,237,250,255});
-        ciphergba_about::text(renderer,"FILE - OPEN ROM  OR  CTRL+O",w/2,
-                              middle+55*scale,2*scale,{155,185,227,255});
+    void uiDrawNoRom(int w,int top,int bottom){
+        const int sc=uiScale(),cw=w/sc,ch=(bottom-top)/sc;
+        const int margin=std::max(30,(cw-1100)/2);
+        const int gap=24,left=std::max(480,(cw-2*margin-gap)*57/100);
+        const int right=cw-2*margin-gap-left,rx=margin+left+gap;
+        const int y=top/sc+45,h=std::min(575,ch-70);
+        uiFill(margin*sc,y*sc,left*sc,h*sc,{20,37,54,255});
+        uiOutline(margin*sc,y*sc,left*sc,h*sc,{66,107,141,255});
+        uiFill(rx*sc,y*sc,right*sc,h*sc,{18,33,53,255});
+        uiOutline(rx*sc,y*sc,right*sc,h*sc,{66,107,141,255});
+        uiFill((margin+28)*sc,(y+31)*sc,60*sc,4*sc,{102,196,255,255});
+        uiText("HODGKINSSTUDIOS  /  GAME BOY ADVANCE",(margin+left/2)*sc,(y+58)*sc,1,{255,214,92,255});
+        uiText("CIPHERGBA",(margin+left/2)*sc,(y+119)*sc,4,{102,196,255,255});
+        uiText("YOUR GBA LIBRARY",(margin+left/2)*sc,(y+176)*sc,2);
+        uiText("A PRECISE GAME BOY ADVANCE EXPERIENCE",(margin+left/2)*sc,(y+229)*sc,1,{184,214,232,255});
+        uiButton(margin+28,y+285,left-56,58,"OPEN ROM  (.GBA / .ZIP)",true);
+        const int half=(left-69)/2;
+        uiButton(margin+28,y+360,half,53,"IMPORT BIOS");
+        uiButton(margin+41+half,y+360,half,53,"CONFIGURE INPUT");
+        uiFill((margin+28)*sc,(y+449)*sc,(left-56)*sc,sc,{72,104,132,255});
+        uiText(core.biosLoaded()?"ORIGINAL BIOS INSTALLED":"HLE MODE ACTIVE",
+               (margin+left/2)*sc,(y+481)*sc,1,{163,220,192,255});
+        // CP93 abstract handheld/toolkit graphic, composed from SDL rectangles.
+        // It is not the project branding image and is never a splash screen.
+        const int deviceW=std::min(294,right-48);
+        const int dx=rx+right/2-deviceW/2,dy=y+42;
+        uiFill(dx*sc,dy*sc,deviceW*sc,225*sc,{40,68,89,255});
+        uiFill((dx+15)*sc,(dy+15)*sc,(deviceW-30)*sc,150*sc,{7,18,28,255});
+        uiFill((dx+25)*sc,(dy+25)*sc,(deviceW-50)*sc,130*sc,{17,48,70,255});
+        for(int i=0;i<14;++i){
+            const int bx=dx+41+i*(deviceW-82)/14;
+            const int bh=16+((i*17+9)%37);
+            uiFill(bx*sc,(dy+102-bh/2)*sc,7*sc,bh*sc,
+                   i%3==0?SDL_Color{255,214,92,255}:SDL_Color{102,196,255,255});
+        }
+        uiFill((dx+30)*sc,(dy+183)*sc,44*sc,17*sc,{13,20,33,255});
+        uiFill((dx+44)*sc,(dy+169)*sc,17*sc,44*sc,{13,20,33,255});
+        uiFill((dx+deviceW-91)*sc,(dy+179)*sc,23*sc,23*sc,{255,214,92,255});
+        uiFill((dx+deviceW-59)*sc,(dy+196)*sc,23*sc,23*sc,{255,214,92,255});
+        uiText("GBA TOOLKIT",(rx+right/2)*sc,(y+313)*sc,2,{102,196,255,255});
+        uiText("240 X 160 / NATIVE C++ / SDL2",
+               (rx+right/2)*sc,(y+354)*sc,1,{185,213,232,255});
+        uiFill((rx+25)*sc,(y+380)*sc,(right-50)*sc,sc,{72,104,132,255});
+        uiText("SAVE STATES / TAS / CHEATS",
+               (rx+right/2)*sc,(y+402)*sc,1,{197,210,230,255});
+        uiText("SCREENSHOTS / VIDEO CAPTURE",
+               (rx+right/2)*sc,(y+437)*sc,1,{197,210,230,255});
+        uiText("GAMESHARK / CODEBREAKER",
+               (rx+right/2)*sc,(y+472)*sc,1,{197,210,230,255});
+        uiFill((rx+25)*sc,(y+516)*sc,175*sc,30*sc,{26,66,62,255});
+        uiText("READY TO PLAY",(rx+112)*sc,(y+524)*sc,1,{156,219,197,255});
     }
-    void mainMenu(){
-        const bool originalPause=paused;
-        paused=true;
-        SDL_MessageBoxButtonData buttons[]={{
-            SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT,1,"File / ROM / Saves"},{
-            0,2,"System / Display / Audio"},{
-            0,3,"Configure input"},{
-            0,4,"Cheat codes"},{
-            0,5,"TAS input recording"},{
-            0,6,"About CipherGBA"},{
-            SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT,0,"Return to game"}};
-        SDL_MessageBoxData box{SDL_MESSAGEBOX_INFORMATION,window,
-            "CipherGBA - Menu",
-            "Portable SDL2 interface\n"
-            "F1: Menu | Ctrl+O: ROM | Ctrl+B: BIOS | Ctrl+I: Input\n"
-            "Some X11-specific features are not available in SDL2.",
-            7,buttons,nullptr};
-        int selected=0;
-        if(SDL_ShowMessageBox(&box,&selected)!=0)selected=0;
-        paused=originalPause;
-        if(selected==1)fileMenu();
-        else if(selected==2)systemMenu();
-        else if(selected==3)openInputMenu();
-        else if(selected==4)cheatMenu();
-        else if(selected==5)tasMenu();
-        else if(selected==6)about();
+    void uiDrawInput(int w,int h){
+        const int sc=uiScale(),cw=w/sc,ch=h/sc;
+        uiFill(0,uiBarHeight(),w,h-uiBarHeight()-uiStatusHeight(),{9,15,24,255});
+        uiText("INPUT CONFIGURATION",cw/2*sc,112*sc,3,{102,196,255,255});
+        uiText("REMAP KEYBOARD AND GAMEPAD CONTROLS",cw/2*sc,156*sc,1,{178,201,225,255});
+        uiText(controller?"GAMEPAD CONNECTED":"NO GAMEPAD CONNECTED",cw/2*sc,180*sc,1,{255,214,92,255});
+        uiFill(32*sc,204*sc,(cw-64)*sc,43*sc,{32,58,83,255});
+        uiText("ACTION",106*sc,217*sc,2);
+        uiText("KEYBOARD",351*sc,217*sc,2);
+        uiText("GAMEPAD",670*sc,217*sc,2);
+        const int rowHeight=std::max(26,std::min(34,(ch-366)/10));
+        for(int i=0;i<10;++i){
+            const int y=248+i*rowHeight;
+            uiFill(32*sc,y*sc,(cw-64)*sc,(rowHeight-1)*sc,
+                   i%2?SDL_Color{14,28,45,255}:SDL_Color{21,43,64,255});
+            uiText(buttonNames_[i],115*sc,(y+9)*sc,1);
+            const char* kn=SDL_GetScancodeName(keyMap_[i]);
+            const char* pn=SDL_GameControllerGetStringForButton(padMap_[i]);
+            const std::string name=(kn&&*kn)?kn:"UNASSIGNED";
+            const std::string pad=(pn&&*pn)?pn:"UNASSIGNED";
+            uiButton(233,y+1,280,rowHeight-2,
+                remap_==RemapMode::Keyboard&&remapIndex_==unsigned(i)?"PRESS KEY":name);
+            uiButton(538,y+1,295,rowHeight-2,
+                remap_==RemapMode::Gamepad&&remapIndex_==unsigned(i)?"PRESS BUTTON":pad);
+        }
+        uiButton(34,ch-113,145,47,"SAVE",true);
+        uiButton(197,ch-113,245,47,"RESET DEFAULTS");
+        uiButton(cw-191,ch-113,157,47,"RETURN");
+    }
+    void uiDrawCheats(int w,int h){
+        const int sc=uiScale(),cw=w/sc,ch=h/sc;
+        uiFill(0,uiBarHeight(),w,h-uiBarHeight()-uiStatusHeight(),{9,15,24,255});
+        uiText("GBA CHEAT ENGINE",cw/2*sc,115*sc,3,{102,196,255,255});
+        uiText("OPEN CHEAT EDITOR TO ADD RAW, CB, GS OR AR CODES",cw/2*sc,158*sc,1);
+        uiText(cheatsEnabled_?"CHEATS ENABLED":"CHEATS DISABLED",
+               cw/2*sc,185*sc,1,{255,214,92,255});
+        const int rows=std::max(1,(ch-510)/41);
+        for(int i=0;i<rows;++i){
+            const int ix=uiCheatScroll_+i;
+            if(ix>=int(cheats_.size()))break;
+            const int y=220+i*41;
+            uiFill(28*sc,y*sc,(cw-56)*sc,38*sc,
+                   i%2?SDL_Color{18,35,55,255}:SDL_Color{27,52,75,255});
+            uiText(cheats_[ix].enabled?"[X]":"[ ]",80*sc,(y+11)*sc,1);
+            auto code=cheats_[ix].source;
+            if(code.size()>56)code=code.substr(0,53)+"...";
+            uiText(code,(cw/2)*sc,(y+11)*sc,1);
+            uiText("TOGGLE",cw*sc-104*sc,(y+11)*sc,1);
+        }
+        uiButton(34,ch-114,187,45,"ADD CODE",true);
+        uiButton(237,ch-114,190,45,"SAVE");
+        uiButton(447,ch-114,180,45,"RELOAD");
+        uiButton(cw-191,ch-114,157,45,"RETURN");
+    }
+    void uiPanelClick(int x,int y){
+        const int sc=uiScale(),cw=0;
+        (void)cw;
+        int w=0,h=0;SDL_GetRendererOutputSize(renderer,&w,&h);
+        const int rw=w/sc,rh=h/sc;
+        if(uiPanel_==UiPanel::Input){
+            const int rowHeight=std::max(26,std::min(34,(rh-366)/10));
+            const int line=y/sc-248;
+            if(line>=0&&line<10*rowHeight){
+                const int row=line/rowHeight;
+                if(uiWithin(x,y,233,248+row*rowHeight,280,rowHeight-1)){
+                    remap_=RemapMode::Keyboard;remapIndex_=unsigned(row);
+                    uiCaptureSingle_=true;mappingTitle();return;
+                }
+                if(uiWithin(x,y,538,248+row*rowHeight,295,rowHeight-1)){
+                    if(!controller){message("Connect a controller before remapping");return;}
+                    remap_=RemapMode::Gamepad;remapIndex_=unsigned(row);
+                    uiCaptureSingle_=true;mappingTitle();return;
+                }
+            }
+            if(uiWithin(x,y,34,rh-113,145,47))uiCloseInput(true);
+            else if(uiWithin(x,y,197,rh-113,245,47)){
+                keyMap_=defaultKeys_;padMap_=defaultPad_;
+                remap_=RemapMode::None;
+            }else if(uiWithin(x,y,rw-191,rh-113,157,47))uiCloseInput(false);
+        }else if(uiPanel_==UiPanel::Cheats){
+            if(uiWithin(x,y,34,rh-114,187,45))cheatMenu();
+            else if(uiWithin(x,y,237,rh-114,190,45))saveCheats();
+            else if(uiWithin(x,y,447,rh-114,180,45))loadCheats();
+            else if(uiWithin(x,y,rw-191,rh-114,157,45))uiPanel_=UiPanel::Game;
+            else{
+                const int line=y/sc-220,rows=std::max(1,(rh-510)/41);
+                if(line>=0&&line<41*rows){
+                    const int ix=uiCheatScroll_+line/41;
+                    if(ix<int(cheats_.size())){
+                        cheats_[ix].enabled=!cheats_[ix].enabled;
+                        saveCheats();
+                    }
+                }
+            }
+        }else if(uiPanel_==UiPanel::Game&&!core.cartridge().loaded()){
+            const int margin=std::max(30,(rw-1100)/2);
+            const int left=std::max(480,(rw-2*margin-24)*57/100);
+            const int y=uiBarHeight()/sc+45;
+            if(uiWithin(x,y,margin+28,y+285,left-56,58))uiAction(1);
+            else if(uiWithin(x,y,margin+28,y+360,(left-69)/2,53))uiAction(2);
+            else if(uiWithin(x,y,margin+41+(left-69)/2,y+360,(left-69)/2,53))uiAction(16);
+        }
     }
     void handleEvent(const SDL_Event& event){
         if(event.type==SDL_MOUSEMOTION){
@@ -963,7 +1234,7 @@ struct Application {
             uiMouseX_=x;uiMouseY_=y;
             if(uiMenu_>=0){
                 const int tab=uiTabAt(x,y);
-                if(tab>=0)uiMenu_=tab;
+                if(tab>=0&&uiMenu_!=tab){uiMenu_=tab;uiSubmenu_=0;}
             }
             return;
         }
@@ -972,13 +1243,32 @@ struct Application {
             uiMouseX_=x;uiMouseY_=y;
             if(uiChromeVisible()){
                 const int tab=uiTabAt(x,y);
-                if(tab>=0){uiMenu_=uiMenu_==tab?-1:tab;return;}
+                if(tab>=0){uiMenu_=uiMenu_==tab?-1:tab;uiSubmenu_=0;return;}
             }
             if(uiMenu_>=0){
                 const int command=uiActionAt(x,y);
-                uiMenu_=-1;
+                if(command==14||command==15||command==6){
+                    const int submenu=command==14?1:command==15?2:3;
+                    uiSubmenu_=uiSubmenu_==submenu?0:submenu;
+                    return;
+                }
+                uiMenu_=-1;uiSubmenu_=0;
                 if(command)uiAction(command);
                 return;
+            }
+            int ww=0,hh=0;SDL_GetRendererOutputSize(renderer,&ww,&hh);
+            const int sc=uiScale();
+            // Header quick-actions also work before a game is loaded.
+            if(uiChromeVisible()&&ww>1050*sc && y<uiBarHeight()){
+                if(x>=ww-221*sc&&x<ww-166*sc){screenshot();return;}
+                if(x>=ww-158*sc&&x<ww-20*sc){
+                    if(!core.cartridge().loaded())uiAction(1);
+                    else paused=!paused;
+                    return;
+                }
+            }
+            if(uiPanel_!=UiPanel::Game || !core.cartridge().loaded()){
+                uiPanelClick(x,y);return;
             }
         }
         if(event.type==SDL_QUIT){running=false;return;}
@@ -1028,9 +1318,19 @@ struct Application {
         }
         if(event.type!=SDL_KEYDOWN||event.key.repeat)return;
         const auto key=event.key.keysym.sym;
-        if(uiMenu_>=0 && key==SDLK_ESCAPE){uiMenu_=-1;return;}
+        if(uiMenu_>=0 && key==SDLK_ESCAPE){uiMenu_=-1;uiSubmenu_=0;return;}
+        if(uiPanel_==UiPanel::Input && remap_==RemapMode::None &&
+           key==SDLK_ESCAPE){uiCloseInput(false);return;}
+        if(uiPanel_==UiPanel::Cheats && key==SDLK_ESCAPE){
+            uiPanel_=UiPanel::Game;return;
+        }
         if(remap_!=RemapMode::None){
-            if(key==SDLK_ESCAPE){remap_=RemapMode::None;openInputMenu(true);return;}
+            if(key==SDLK_ESCAPE){
+                remap_=RemapMode::None;
+                if(!uiCaptureSingle_)openInputMenu(true);
+                uiCaptureSingle_=false;
+                return;
+            }
             if(remap_==RemapMode::Keyboard){
                 keyMap_[remapIndex_]=key==SDLK_DELETE?SDL_SCANCODE_UNKNOWN:
                     event.key.keysym.scancode;
@@ -1040,10 +1340,10 @@ struct Application {
         }
         if((event.key.keysym.mod & KMOD_CTRL) && key==SDLK_o)chooseFile(false);
         else if((event.key.keysym.mod & KMOD_CTRL) && key==SDLK_b)chooseFile(true);
-        else if((event.key.keysym.mod & KMOD_CTRL) && key==SDLK_i)openInputMenu();
-        else if(key==SDLK_F1)mainMenu();
+        else if((event.key.keysym.mod & KMOD_CTRL) && key==SDLK_i)uiOpenInput();
+        else if(key==SDLK_F1){uiMenu_=uiMenu_>=0?-1:0;uiSubmenu_=0;}
         else if(key==SDLK_F3)tasMenu();
-        else if(key==SDLK_F12)toggleAvi();
+        else if(key==SDLK_F12)uiAction(21);
         else if(key==SDLK_ESCAPE||key==SDLK_F11)toggleFullscreen();
         else if(key==SDLK_F7)paused=!paused;
         else if(key==SDLK_F5)saveState();
@@ -1078,7 +1378,7 @@ struct Application {
         }
         return buttons;
     }
-    void runFrame(bool fastForward){
+    void runFrame(){
         auto buttons=input();
         std::uint16_t mask=0;
         for(unsigned i=0;i<10;i++)if(buttons[i])mask|=std::uint16_t(1u<<i);
@@ -1099,11 +1399,11 @@ struct Application {
             avi_.close();
             message("AVI recording stopped: file limit or I/O error");
         }
-        if(audio && !muted && !fastForward){
+        if(audio && !muted){
             if(SDL_GetQueuedAudioSize(audio)>32768)SDL_ClearQueuedAudio(audio);
             if(!samples.empty())SDL_QueueAudio(audio,samples.data(),
                 static_cast<std::uint32_t>(samples.size()*sizeof(std::int16_t)));
-        }else if(audio && fastForward)SDL_ClearQueuedAudio(audio);
+        }
     }
     void render(){
         int w=0,h=0;SDL_GetRendererOutputSize(renderer,&w,&h);
@@ -1112,7 +1412,10 @@ struct Application {
         const int bottom=h-(chrome?uiStatusHeight():0);
         SDL_SetRenderDrawColor(renderer,10,14,19,255);
         SDL_RenderClear(renderer);
-        if(core.cartridge().loaded()){
+        if(uiPanel_!=UiPanel::Game){
+            if(uiPanel_==UiPanel::Input)uiDrawInput(w,h);
+            else if(uiPanel_==UiPanel::Cheats)uiDrawCheats(w,h);
+        }else if(core.cartridge().loaded()){
             const auto& frame=core.framebuffer();
             for(std::size_t i=0;i<rgba.size();i++)rgba[i]=0xff000000u|frame[i];
             SDL_UpdateTexture(texture,nullptr,rgba.data(),kWidth*int(sizeof(std::uint32_t)));
@@ -1130,40 +1433,42 @@ struct Application {
             uiDrawNoRom(w,top,bottom);
         }
         if(chrome)uiDrawChrome(w,h);
+        if(uiToast_ && std::chrono::steady_clock::now()<uiToastUntil_){
+            const int sc=uiScale();
+            uiFill(std::max(0,(w-430*sc)/2),h-155*sc,430*sc,48*sc,{10,25,40,255});
+            uiOutline(std::max(0,(w-430*sc)/2),h-155*sc,430*sc,48*sc,{255,211,91,255});
+            uiText(uiToastMessage_,w/2,h-140*sc,1,{255,226,162,255});
+        }
         SDL_RenderPresent(renderer);
     }
-    int loop(unsigned smokeFrameLimit=0){
+    int loop(unsigned smokeFrameLimit=0,unsigned uiSmokeFrameLimit=0){
         using Clock=std::chrono::steady_clock;
         auto next=Clock::now();
         auto statusAt=next;
         unsigned count=0;
         unsigned totalFrames=0;
+        unsigned uiFrames=0;
         while(running){
             SDL_Event e{};
             while(SDL_PollEvent(&e))handleEvent(e);
             if(!running)break;
-            const bool fast=SDL_GetKeyboardState(nullptr)[SDL_SCANCODE_TAB]!=0;
             const auto now=Clock::now();
-            if(!paused && core.cartridge().loaded() && (fast || now>=next)){
-                const int runs=fast?4:1;
-                for(int i=0;i<runs;i++){
-                    runFrame(fast);
-                    ++totalFrames;
-                    if(smokeFrameLimit && totalFrames>=smokeFrameLimit)return 0;
-                }
-                count+=static_cast<unsigned>(runs);
-                if(fast){next=Clock::now();}else{
-                    const auto framePeriod=std::chrono::duration<double>(
-                        100.0/(kFramesPerSecond*speedPercent_));
-                    next+=std::chrono::duration_cast<Clock::duration>(framePeriod);
-                    if(next+std::chrono::milliseconds(100)<Clock::now())next=Clock::now();
-                }
+            if(!paused && core.cartridge().loaded() && now>=next){
+                runFrame();
+                ++totalFrames;
+                if(smokeFrameLimit && totalFrames>=smokeFrameLimit)return 0;
+                ++count;
+                const auto framePeriod=std::chrono::duration<double>(
+                    100.0/(kFramesPerSecond*speedPercent_));
+                next+=std::chrono::duration_cast<Clock::duration>(framePeriod);
+                if(next+std::chrono::milliseconds(100)<Clock::now())next=Clock::now();
             }
             render();
+            if(uiSmokeFrameLimit && ++uiFrames>=uiSmokeFrameLimit)return 0;
             const auto update=Clock::now();
             if(update-statusAt>=std::chrono::seconds(1)){
                 const double interval=std::chrono::duration<double>(update-statusAt).count();
-                std::ostringstream title;title<<"CipherGBA v0.1";
+                std::ostringstream title;title<<"CipherGBA v0.2";
                 if(!romName.empty())title<<" - "<<romName;
                 else title<<" | F1 Menu / Ctrl+O Open ROM";
                 title<<" | "<<std::fixed<<std::setprecision(1)<<count/interval<<" FPS";
@@ -1179,7 +1484,7 @@ struct Application {
                 SDL_SetWindowTitle(window,title.str().c_str());
                 statusAt=update;count=0;
             }
-            if(!fast && next>update){
+            if(next>update){
                 const auto left=std::chrono::duration_cast<std::chrono::milliseconds>(next-update);
                 if(left.count()>1)SDL_Delay(static_cast<Uint32>(std::min<long long>(left.count()-1,4)));
                 else SDL_Delay(1);
@@ -1189,12 +1494,12 @@ struct Application {
     }
 };
 void help(){
-    std::puts("CipherGBA v0.1 (SDL2 frontend)");
-    std::puts("Usage: CipherGBA [--rom PATH] [--bios PATH] [--import-data DIR] [--verify-rom PATH] [--smoke-frames N] [--help] [--version]");
-    std::puts("F1: Main menu. Ctrl+O: Open ROM; Ctrl+B: Import BIOS; Ctrl+I: Input remap.");
+    std::puts("CipherGBA v0.2 (SDL2 frontend)");
+    std::puts("Usage: CipherGBA [--rom PATH] [--bios PATH] [--import-data DIR] [--verify-rom PATH] [--smoke-frames N] [--ui-smoke-frames N] [--help] [--version]");
+    std::puts("F1: Library menu. Ctrl+O: Open ROM; Ctrl+B: Import BIOS; Ctrl+I: Input remap.");
     std::puts("Controls: Z=A X=B Backspace=Select Enter=Start Arrows=D-pad A=L S=R");
     std::puts("F2 Reset, F3 TAS, F4 Mute, F5 Save, F6 Slot, F7 Pause, F8 Load, F9 PNG");
-    std::puts("F10 Stretch, F11/Escape Fullscreen, F12 AVI record, Tab Fast-forward.");
+    std::puts("F10 Stretch, F11/Escape Fullscreen, F12 AVI record.");
     std::puts("User save data uses the OS-specific SDL preferences directory.");
     std::puts("--import-data DIR copies existing saves/states/TAS/cheats/BIOS without overwriting.");
     std::puts("You may also drag the old CipherGBA_Data folder onto the SDL2 window.");
@@ -1202,10 +1507,20 @@ void help(){
 }
 int main(int argc,char** argv){
     std::string rom,bios,verify,oldData;
-    unsigned smokeFrames=0;
+    unsigned smokeFrames=0,uiSmokeFrames=0;
     for(int i=1;i<argc;i++){
         const std::string arg=argv[i];
-        if(arg=="--version"){std::puts("CipherGBA v0.1.0");return 0;}
+        if(arg=="--version"){std::puts("CipherGBA v0.2.0");return 0;}
+        if(arg=="--ui-smoke-frames" && i+1<argc){
+            const std::string value=argv[++i];
+            char* end=nullptr;
+            const auto parsed=std::strtol(value.c_str(),&end,10);
+            if(!end||*end!='\0'||parsed<1||parsed>300){
+                std::fprintf(stderr,"--ui-smoke-frames must be 1..300\n");return 2;
+            }
+            uiSmokeFrames=static_cast<unsigned>(parsed);
+            continue;
+        }
         if(arg=="--help"){help();return 0;}
         if(arg=="--smoke-frames" && i+1<argc){
             const std::string value=argv[++i];
@@ -1248,5 +1563,5 @@ int main(int argc,char** argv){
     if(!rom.empty()&&!app.loadRom(userPath(rom)))return 1;
     // Startup draws the visible File/System/Config/Help toolbar itself.
     // About artwork never replaces the emulator frontend.
-    return app.loop(smokeFrames);
+    return app.loop(smokeFrames,uiSmokeFrames);
 }

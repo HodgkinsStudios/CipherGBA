@@ -1,6 +1,6 @@
-name: v0.1 portability builds
+name: v0.2 portability builds
 concurrency:
-  group: ciphergba-v01-${{ github.ref }}
+  group: ciphergba-v02-${{ github.ref }}
   cancel-in-progress: true
 on:
   push:
@@ -49,11 +49,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Archive clean source from authoritative commit
-        run: git archive --format=zip --output CipherGBA-v0.1-CLEAN_SOURCE-CI.zip HEAD
+        run: git archive --format=zip --output CipherGBA-v0.2-CLEAN_SOURCE-CI.zip HEAD
       - uses: actions/upload-artifact@v4
         with:
-          name: CipherGBA-v0.1-CLEAN_SOURCE-CI
-          path: CipherGBA-v0.1-CLEAN_SOURCE-CI.zip
+          name: CipherGBA-v0.2-CLEAN_SOURCE-CI
+          path: CipherGBA-v0.2-CLEAN_SOURCE-CI.zip
           if-no-files-found: error
           retention-days: 30
 
@@ -73,26 +73,26 @@ jobs:
         run: bin/CipherGBA --help && bin/CipherGBA --version
       - name: Package native Linux X11 CI build
         run: |
-          mkdir -p dist/CipherGBA-v0.1-Linux-X11-x86_64-CI
-          cp bin/CipherGBA dist/CipherGBA-v0.1-Linux-X11-x86_64-CI/
+          mkdir -p dist/CipherGBA-v0.2-Linux-X11-x86_64-CI
+          cp bin/CipherGBA dist/CipherGBA-v0.2-Linux-X11-x86_64-CI/
           cp -L bin/libCipherGBA_Core.so.1 \
-            dist/CipherGBA-v0.1-Linux-X11-x86_64-CI/libCipherGBA_Core.so.1
+            dist/CipherGBA-v0.2-Linux-X11-x86_64-CI/libCipherGBA_Core.so.1
           cp README.md THIRD_PARTY_NOTICES.md \
-            dist/CipherGBA-v0.1-Linux-X11-x86_64-CI/
-          cat > dist/CipherGBA-v0.1-Linux-X11-x86_64-CI/START_HERE.txt <<'EOF'
-          CipherGBA v0.1 Linux X11/XWayland (automated CI build)
+            dist/CipherGBA-v0.2-Linux-X11-x86_64-CI/
+          cat > dist/CipherGBA-v0.2-Linux-X11-x86_64-CI/START_HERE.txt <<'EOF'
+          CipherGBA v0.2 Linux X11/XWayland (automated CI build)
           Set executable permission and run ./CipherGBA --rom /path/to/game.gba
           Requires compatible Linux x86_64 with libX11, zlib, C++ runtime.
           Optional system SDL2 audio, GTK3 native file picker and ffmpeg capture.
           The X11 frontend retains its native desktop user interface.
           Automated CI package: verify functionality on your target system.
           EOF
-          cd dist/CipherGBA-v0.1-Linux-X11-x86_64-CI
+          cd dist/CipherGBA-v0.2-Linux-X11-x86_64-CI
           sha256sum CipherGBA libCipherGBA_Core.so.1 > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: CipherGBA-v0.1-Linux-X11-x86_64-CI
-          path: dist/CipherGBA-v0.1-Linux-X11-x86_64-CI/
+          name: CipherGBA-v0.2-Linux-X11-x86_64-CI
+          path: dist/CipherGBA-v0.2-Linux-X11-x86_64-CI/
           if-no-files-found: error
           retention-days: 14
 
@@ -121,7 +121,11 @@ jobs:
           python3 .github/scripts/create_smoke_rom.py build-sdl/smoke.gba
           SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
             timeout 45s bin/CipherGBA --rom build-sdl/smoke.gba --smoke-frames 90
-      - name: Verify non-destructive v0.1 data migration, repeated imports and filter
+      - name: No-ROM CP93 frontend startup and render smoke
+        run: |
+          SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
+            timeout 20s bin/CipherGBA --ui-smoke-frames 20
+      - name: Verify non-destructive v0.2 data migration, repeated imports and filter
         run: python3 .github/scripts/check_legacy_migration.py bin/CipherGBA build-sdl/smoke.gba
       - name: Verify SRAM persistence across restarts
         run: python3 .github/scripts/check_battery_persistence.py bin/CipherGBA
@@ -192,7 +196,7 @@ jobs:
           fi
       - name: Package signed app with macOS metadata and executable permissions
         run: |
-          archive="$PWD/CipherGBA-v0.1-macOS-${{ matrix.arch }}-CI.zip"
+          archive="$PWD/CipherGBA-v0.2-macOS-${{ matrix.arch }}-CI.zip"
           (cd dist/macOS && ditto -c -k --sequesterRsrc --keepParent CipherGBA.app "$archive")
           mkdir -p "$RUNNER_TEMP/ciphergba-package-check"
           ditto -x -k "$archive" "$RUNNER_TEMP/ciphergba-package-check"
@@ -200,8 +204,8 @@ jobs:
           codesign --verify --deep --strict "$RUNNER_TEMP/ciphergba-package-check/CipherGBA.app"
       - uses: actions/upload-artifact@v4
         with:
-          name: CipherGBA-v0.1-macOS-${{ matrix.arch }}-CI
-          path: CipherGBA-v0.1-macOS-${{ matrix.arch }}-CI.zip
+          name: CipherGBA-v0.2-macOS-${{ matrix.arch }}-CI
+          path: CipherGBA-v0.2-macOS-${{ matrix.arch }}-CI.zip
           if-no-files-found: error
           retention-days: 14
 
@@ -253,8 +257,8 @@ jobs:
         run: bash packaging/windows/package-windows.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: CipherGBA-v0.1-Windows-x64-CI
-          path: dist/CipherGBA-v0.1-Windows-x64-CI/
+          name: CipherGBA-v0.2-Windows-x64-CI
+          path: dist/CipherGBA-v0.2-Windows-x64-CI/
           if-no-files-found: error
           retention-days: 14
 
@@ -289,7 +293,7 @@ jobs:
           python3 .github/scripts/check_battery_persistence.py "$app"
       - uses: actions/upload-artifact@v4
         with:
-          name: CipherGBA-v0.1-AppImage-x86_64-CI
+          name: CipherGBA-v0.2-AppImage-x86_64-CI
           path: "*.AppImage"
           if-no-files-found: error
           retention-days: 14
@@ -314,11 +318,11 @@ jobs:
         run: |
           mkdir -p dist
           flatpak build-bundle flatpak-repo \
-            dist/CipherGBA-v0.1-Linux-Flatpak-CI.flatpak \
+            dist/CipherGBA-v0.2-Linux-Flatpak-CI.flatpak \
             io.github.hodgkinsstudios.CipherGBA \
             --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo
           flatpak --user install -y --noninteractive --bundle \
-            dist/CipherGBA-v0.1-Linux-Flatpak-CI.flatpak
+            dist/CipherGBA-v0.2-Linux-Flatpak-CI.flatpak
           flatpak --user run io.github.hodgkinsstudios.CipherGBA --version
           appdata="$HOME/.var/app/io.github.hodgkinsstudios.CipherGBA/data"
           mkdir -p "$appdata"
@@ -328,12 +332,12 @@ jobs:
             --rom "$appdata/smoke.gba" --smoke-frames 90
       - uses: actions/upload-artifact@v4
         with:
-          name: CipherGBA-v0.1-Flatpak-CI
+          name: CipherGBA-v0.2-Flatpak-CI
           path: dist/*.flatpak
           if-no-files-found: error
           retention-days: 14
   release-assets:
-    name: Validate consolidated v0.1 release packages
+    name: Validate consolidated v0.2 release packages
     runs-on: ubuntu-24.04
     needs:
       - source-archive
@@ -349,16 +353,16 @@ jobs:
         with:
           path: ci-artifacts
       - name: Build exact source archive
-        run: git archive --format=zip --output CipherGBA-v0.1-Source.zip HEAD
+        run: git archive --format=zip --output CipherGBA-v0.2-Source.zip HEAD
       - name: Assemble, inspect and checksum all seven platform/source packages
         run: |
           python3 packaging/release/assemble.py \
             --artifacts ci-artifacts \
-            --source CipherGBA-v0.1-Source.zip \
+            --source CipherGBA-v0.2-Source.zip \
             --output dist --commit "$GITHUB_SHA"
       - uses: actions/upload-artifact@v4
         with:
-          name: CipherGBA-v0.1-RELEASE-ASSETS
+          name: CipherGBA-v0.2-RELEASE-ASSETS
           path: dist/
           if-no-files-found: error
           retention-days: 30
