@@ -230,7 +230,7 @@ class App {
     Panel panel_=Game;
     bool running_=true,dirty_=true,mapPad_=false,fullscreen_=false,stretched_=false;
     bool paused_=false,muted_=false,cheatsOn_=false,recordToast_=true,recordTimer_=false;
-    bool tasRecording_=false,tasPlayback_=false,tasReset_=true,fastForward_=false;
+    bool tasRecording_=false,tasPlayback_=false,tasReset_=true;
     bool cheatEditing_=false,showMenuInFullscreen_=false;
     std::string cheatText_,message_,toast_;
     Clock::time_point toastTime_{},lastFrame_{};std::set<KeySym> pressed_;
@@ -240,37 +240,12 @@ class App {
     std::size_t tasCursor_=0;
     std::vector<cheats::Program> cheats_;
     bool cheatDeviceButton_=false;
-    // CP93 fast-forward is host input, not part of the emulated GBA KEYINPUT.
-    KeySym fastKey_=XK_Tab,workingFastKey_=XK_Tab;
-    PadMapping fastPad_{PadMapping::Type::Button,-1,1};
-    PadMapping workingFastPad_{PadMapping::Type::Button,-1,1};
     fs::path recordingsDir_;
     std::uint64_t recordingFrames_=0;
     std::string romLabel_="NO ROM";
     static Item action(std::string text,int cmd){return {std::move(text),cmd,0,false};}
     static Item branch(std::string text,int sub){return {std::move(text),0,sub,false};}
     static Item separator(){return {"",0,0,true};}
-    fs::path fastBindingsPath()const{return paths_.dataDirectory/"config"/"fast_forward.map";}
-    void loadFastBindings(){
-        std::ifstream in(fastBindingsPath());std::string signature;
-        unsigned long key=0;int type=0,index=-1,direction=1;
-        if(in>>signature>>key>>type>>index>>direction &&
-           signature=="CipherGBA_FAST_V1" && key<=0xffffffffu &&
-           (type==0||type==1) && index>=-1 && index<32 &&
-           (direction==-1||direction==1)){
-            fastKey_=static_cast<KeySym>(key);
-            fastPad_={type?PadMapping::Type::Axis:PadMapping::Type::Button,
-                      index,direction};
-        }
-    }
-    bool saveFastBindings(){
-        std::ofstream out(fastBindingsPath(),std::ios::trunc);
-        if(!out)return false;
-        out<<"CipherGBA_FAST_V1 "<<static_cast<unsigned long>(fastKey_)<<' '
-           <<(fastPad_.type==PadMapping::Type::Axis?1:0)<<' '
-           <<fastPad_.index<<' '<<fastPad_.direction<<'\n';
-        return bool(out);
-    }
     void buildMenus(){
         // CP93 navigation order, preserving all actions from the newer core.
         menus_={
@@ -457,8 +432,6 @@ public:
         core_.configureSaveDirectory(paths_.dataDirectory/"saves",err);
         if(fs::exists(paths_.inputConfig))Bindings::load(paths_.inputConfig,bindings_,err);
         editing_=bindings_;
-        loadFastBindings();
-        workingFastKey_=fastKey_;workingFastPad_=fastPad_;
         if(fs::exists(paths_.biosFile)&&!core_.loadInstalledBios(paths_.biosFile,err))notice("BIOS: "+err);
     }
     ~App(){avi_.stop();if(dpy_){destroyScaledImage();if(back_)XFreePixmap(dpy_,back_);if(gc_)XFreeGC(dpy_,gc_);
@@ -496,16 +469,11 @@ public:
         while(running_){
             while(XPending(dpy_))handleEvent();
             joystick_.poll([&](PadMapping p){
-                if(mapping_>=0&&mapPad_){
-                    if(mapping_==Controls)workingFastPad_=p;
-                    else editing_.pad[static_cast<std::size_t>(mapping_)]=p;
+                if(mapping_>=0&&mapPad_&&mapping_<Controls){
+                    editing_.pad[static_cast<std::size_t>(mapping_)]=p;
                     mapping_=-1;dirty_=true;
                 }
             });
-            const bool hostFastForward=pressed_.count(fastKey_)!=0||joystick_.down(fastPad_);
-            if(fastForward_!=hostFastForward){
-                fastForward_=hostFastForward;audio_.reset();dirty_=true;
-            }
             if(core_.cartridge().loaded()&&panel_==Game&&!paused_){
                 const auto now=Clock::now();if(now>=nextFrame){
                         if(perfLogEnabled_){
@@ -559,15 +527,15 @@ public:
                         }
                         auto samples=core_.takeAudioSamples();
                         if(avi_.active())avi_.appendAudio(samples.data(),samples.size());
-                        audio_.push(samples,!muted_&&!fastForward_&&speed_==100);
-                        if(perfLogEnabled_ && !muted_ && !fastForward_ && speed_==100 && audio_.available()){
+                        audio_.push(samples,!muted_&&speed_==100);
+                        if(perfLogEnabled_ && !muted_ && speed_==100 && audio_.available()){
                             const double queuedMs=audio_.queuedMilliseconds();
                             audioQueueMsSum_+=queuedMs;
                             audioQueueMsMax_=std::max(audioQueueMsMax_,queuedMs);
                             ++audioQueueSamples_;
                         }
                         if(avi_.active()){avi_.append(core_.framebuffer().data());++recordingFrames_;}
-                        const double factor=fastForward_?3.0:double(speed_)/100.0;
+                        const double factor=double(speed_)/100.0;
                         nextFrame+=std::chrono::duration_cast<Clock::duration>(std::chrono::duration<double>(FrameDuration/factor));
                         if(nextFrame<now-std::chrono::milliseconds(80))nextFrame=now;
                 }
@@ -970,7 +938,7 @@ private:
     void renderStatus(){
         if(fullscreen_)return;
         rect(0,h_-StatusH,w_,StatusH,0x070d15);rect(0,h_-StatusH,w_,1,0x486988);
-        std::string status=romLabel_+"  SLOT "+std::to_string(slot_)+"  "+std::to_string(fastForward_?300:speed_)+"%";
+        std::string status=romLabel_+"  SLOT "+std::to_string(slot_)+"  "+std::to_string(speed_)+"%";
         if(core_.cartridge().loaded()){
             status+="  "+std::to_string(int(actualFps_+0.5))+" FPS";
             char times[72];
@@ -1009,13 +977,11 @@ private:
             label(25,Bar+42,"CONTROLLER INPUT",0x67c3ff);
             label(25,Bar+72,"Click a binding, then press a keyboard key or gamepad button / axis.",0xc3d9e9);
             label(25,Bar+105,"GBA",0xa7c6df);label(197,Bar+105,"KEYBOARD",0xa7c6df);label(476,Bar+105,"GAMEPAD",0xa7c6df);
-            for(int i=0;i<Controls+1;i++){
+            for(int i=0;i<Controls;i++){
                 const int yy=Bar+121+i*39;
-                label(25,yy+23,i==Controls?"FAST FORWARD":inputNames[i],0xf0f4fa);
-                button(176,yy,260,33,keyName(i==Controls?workingFastKey_:editing_.keyboard[i]),
-                       mapping_==i&&!mapPad_);
-                button(460,yy,285,33,padName(i==Controls?workingFastPad_:editing_.pad[i]),
-                       mapping_==i&&mapPad_);
+                label(25,yy+23,inputNames[i],0xf0f4fa);
+                button(176,yy,260,33,keyName(editing_.keyboard[i]),mapping_==i&&!mapPad_);
+                button(460,yy,285,33,padName(editing_.pad[i]),mapping_==i&&mapPad_);
             }
             if(mapping_>=0)label(25,h_-StatusH-102,mapPad_?"WAITING FOR GAMEPAD INPUT...":"PRESS A KEY...",0xffd777);
             button(24,h_-StatusH-72,144,41,"SAVE");button(179,h_-StatusH-72,160,41,"DEFAULTS");
@@ -1089,7 +1055,6 @@ private:
             case Speed50:speed_=50;audio_.reset();break;
             case Speed25:speed_=25;audio_.reset();break;
             case InputConfig:panel_=Controller;editing_=bindings_;
-                workingFastKey_=fastKey_;workingFastPad_=fastPad_;
                 mapping_=-1;pressed_.clear();break;
             case Screenshot:writeScreenshot();break;
             case SaveState:captureSlot();break;
@@ -1112,22 +1077,16 @@ private:
     }
     bool panelClick(int x,int y){
         if(panel_==Controller){
-            for(int k=0;k<Controls+1;k++){const int yy=Bar+121+k*39;
+            for(int k=0;k<Controls;k++){const int yy=Bar+121+k*39;
                 if(y>=yy&&y<yy+33){if(x>=176&&x<436){mapping_=k;mapPad_=false;}
                     else if(x>=460&&x<745){mapping_=k;mapPad_=true;}
                     dirty_=true;return true;}}
             if(y>=h_-StatusH-72&&y<h_-StatusH-31){
                 if(x>=24&&x<168){std::string e;if(editing_.save(paths_.inputConfig,e)){
                     bindings_=editing_;
-                    fastKey_=workingFastKey_;fastPad_=workingFastPad_;
-                    if(!saveFastBindings())notice("FAST FORWARD MAPPING SAVE FAILED");
                     panel_=Game;notice("CONTROLLER INPUT SAVED");
                 }else notice("CANNOT SAVE INPUT CONFIG");mapping_=-1;}
-                else if(x>=179&&x<339){
-                    editing_=Bindings::defaults();workingFastKey_=XK_Tab;
-                    workingFastPad_={PadMapping::Type::Button,-1,1};
-                    mapping_=-1;
-                }
+                else if(x>=179&&x<339){editing_=Bindings::defaults();mapping_=-1;}
                 else if(x>=350&&x<504){panel_=Game;mapping_=-1;}
             }
             dirty_=true;return true;
@@ -1224,7 +1183,7 @@ private:
             case Expose:dirty_=true;break;
             case ConfigureNotify:if(e.xconfigure.width!=w_||e.xconfigure.height!=h_)resize(e.xconfigure.width,e.xconfigure.height);break;
             case ClientMessage:if(Atom(e.xclient.data.l[0])==wmDelete_)running_=false;break;
-            case FocusOut:pressed_.clear();fastForward_=false;break;
+            case FocusOut:pressed_.clear();break;
             case MotionNotify:motion(e.xmotion.x,e.xmotion.y);break;
             case ButtonPress:
                 if(e.xbutton.button==Button1)click(e.xbutton.x,e.xbutton.y);
@@ -1253,9 +1212,8 @@ private:
                 break;
             case KeyPress:{
                 KeySym key=XLookupKeysym(&e.xkey,0);
-                if(panel_==Controller){if(mapping_>=0&&!mapPad_){
-                    if(mapping_==Controls)workingFastKey_=key;
-                    else editing_.keyboard[static_cast<std::size_t>(mapping_)]=std::uint32_t(key);
+                if(panel_==Controller){if(mapping_>=0&&!mapPad_&&mapping_<Controls){
+                    editing_.keyboard[static_cast<std::size_t>(mapping_)]=std::uint32_t(key);
                     mapping_=-1;dirty_=true;}
                     else if(key==XK_Escape){panel_=Game;mapping_=-1;dirty_=true;}
                     break;}
@@ -1283,13 +1241,10 @@ private:
                 if(key==XK_F8){restoreSlot();break;}
                 if(key==XK_F9){writeScreenshot();break;}
                 if(key==XK_F7){execute(Pause);break;}
-                if(key==fastKey_){fastForward_=true;pressed_.insert(key);
-                    audio_.reset();dirty_=true;break;}
                 pressed_.insert(key);break;
             }
             case KeyRelease:{const KeySym key=XLookupKeysym(&e.xkey,0);
-                pressed_.erase(key);
-                if(key==fastKey_){fastForward_=joystick_.down(fastPad_);audio_.reset();}break;}
+                pressed_.erase(key);break;}
         }
     }
 };
