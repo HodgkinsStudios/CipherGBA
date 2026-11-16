@@ -1,0 +1,29 @@
+name: Linux build
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake zlib1g-dev libx11-dev
+      - name: Configure portable Release
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCIPHERGBA_NATIVE_TUNING=OFF -DPIXELGBA_ENABLE_LTO=ON
+      - name: Build emulator and required libraries only
+        run: cmake --build build --target CipherGBA -j 2
+      - name: CLI smoke check
+        run: |
+          bin/CipherGBA --version
+          bin/CipherGBA --help
+      - name: Shared core dependencies
+        run: |
+          ldd bin/CipherGBA
+          ldd bin/libCipherGBA_Core.so.1

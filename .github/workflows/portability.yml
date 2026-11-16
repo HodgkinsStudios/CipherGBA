@@ -1,0 +1,364 @@
+name: v0.1 portability builds
+concurrency:
+  group: ciphergba-v01-${{ github.ref }}
+  cancel-in-progress: true
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  stop-obsolete-main-runs:
+    # Only cancel stale CI runs on main, never pull requests.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Cancel stale main CI runs from older commits
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'portability.yml',
+              branch: 'main',
+              per_page: 100
+            });
+            for (const run of runs) {
+              if (run.id === context.runId || run.head_sha === context.sha) continue;
+              if (!['queued', 'in_progress', 'waiting'].includes(run.status)) continue;
+              try {
+                await github.rest.actions.cancelWorkflowRun({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  run_id: run.id
+                });
+                core.info('Cancelled obsolete CI run ' + run.id);
+              } catch(e) {
+                core.warning('Could not cancel run ' + run.id + ': ' + e.message);
+              }
+            }
+
+  source-archive:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Archive clean source from authoritative commit
+        run: git archive --format=zip --output CipherGBA-v0.1-CLEAN_SOURCE-CI.zip HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CipherGBA-v0.1-CLEAN_SOURCE-CI
+          path: CipherGBA-v0.1-CLEAN_SOURCE-CI.zip
+          if-no-files-found: error
+          retention-days: 30
+
+  linux-x11:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependencies
+        run: sudo apt-get update && sudo apt-get install -y libx11-dev zlib1g-dev
+      - name: Verify unified icon assets across platforms
+        run: python3 .github/scripts/verify_branding_assets.py
+      - name: Configure
+        run: cmake -S . -B build-x11 -DCMAKE_BUILD_TYPE=Release -DCIPHERGBA_FRONTEND=X11 -DPIXELGBA_ENABLE_LTO=OFF
+      - name: Build
+        run: cmake --build build-x11 --target CipherGBA -j 2
+      - name: CLI sanity
+        run: bin/CipherGBA --help && bin/CipherGBA --version
+      - name: Package native Linux X11 CI build
+        run: |
+          mkdir -p dist/CipherGBA-v0.1-Linux-X11-x86_64-CI
+          cp bin/CipherGBA dist/CipherGBA-v0.1-Linux-X11-x86_64-CI/
+          cp -L bin/libCipherGBA_Core.so.1 \
+            dist/CipherGBA-v0.1-Linux-X11-x86_64-CI/libCipherGBA_Core.so.1
+          cp README.md THIRD_PARTY_NOTICES.md \
+            dist/CipherGBA-v0.1-Linux-X11-x86_64-CI/
+          cat > dist/CipherGBA-v0.1-Linux-X11-x86_64-CI/START_HERE.txt <<'EOF'
+          CipherGBA v0.1 Linux X11/XWayland (automated CI build)
+          Set executable permission and run ./CipherGBA --rom /path/to/game.gba
+          Requires compatible Linux x86_64 with libX11, zlib, C++ runtime.
+          Optional system SDL2 audio, GTK3 native file picker and ffmpeg capture.
+          The X11 frontend retains its native desktop user interface.
+          Automated CI package: verify functionality on your target system.
+          EOF
+          cd dist/CipherGBA-v0.1-Linux-X11-x86_64-CI
+          sha256sum CipherGBA libCipherGBA_Core.so.1 > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CipherGBA-v0.1-Linux-X11-x86_64-CI
+          path: dist/CipherGBA-v0.1-Linux-X11-x86_64-CI/
+          if-no-files-found: error
+          retention-days: 14
+
+  linux-sdl2:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependencies
+        run: sudo apt-get update && sudo apt-get install -y libsdl2-dev zlib1g-dev libdbus-1-dev ffmpeg
+      - name: Configure
+        run: cmake -S . -B build-sdl -DCMAKE_BUILD_TYPE=Release -DCIPHERGBA_FRONTEND=SDL2 -DPIXELGBA_ENABLE_LTO=OFF -DCIPHERGBA_BUILD_PERSISTENCE_SMOKE=ON
+      - name: Build
+        run: cmake --build build-sdl --target CipherGBA CipherGBA_PersistenceSmoke CipherGBA_CpuPhaseSmoke -j 2
+      - name: Test save and battery durability
+        run: build-sdl/persistence-tools/CipherGBA_PersistenceSmoke build-sdl/persistence-checks
+      - name: Thumb CPU I/O and HBlank phase regression
+        run: build-sdl/persistence-tools/CipherGBA_CpuPhaseSmoke
+      - name: CLI sanity
+        run: bin/CipherGBA --help && bin/CipherGBA --version
+      - name: Validate offline suite-score helper syntax
+        run: python3 -m py_compile .github/scripts/verify_suite_scores.py
+      - name: Synthetic raw and ZIP ROM smoke
+        run: python3 .github/scripts/check_rom_loading.py bin/CipherGBA
+      - name: Headless SDL2 gameplay loop smoke
+        run: |
+          python3 .github/scripts/create_smoke_rom.py build-sdl/smoke.gba
+          SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
+            timeout 45s bin/CipherGBA --rom build-sdl/smoke.gba --smoke-frames 90
+      - name: Verify non-destructive v0.1 data migration, repeated imports and filter
+        run: python3 .github/scripts/check_legacy_migration.py bin/CipherGBA build-sdl/smoke.gba
+      - name: Verify SRAM persistence across restarts
+        run: python3 .github/scripts/check_battery_persistence.py bin/CipherGBA
+      - name: Generate and decode a portable AVI
+        run: |
+          g++ -std=c++17 -O2 -I CipherGBA_Frontend/src \
+            .github/scripts/avi_smoke.cpp -o build-sdl/avi_smoke
+          build-sdl/avi_smoke build-sdl/smoke.avi
+          ffmpeg -v error -i build-sdl/smoke.avi -f null -
+          python3 .github/scripts/check_avi.py build-sdl/smoke.avi
+
+  macos-sdl2:
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Dependencies
+        run: brew install sdl2 sdl3
+      - name: Configure
+        run: cmake -S . -B build-mac -DCMAKE_BUILD_TYPE=Release -DCIPHERGBA_FRONTEND=SDL2 -DPIXELGBA_ENABLE_LTO=OFF -DCIPHERGBA_BUILD_PERSISTENCE_SMOKE=ON
+      - name: Build
+        run: cmake --build build-mac --target CipherGBA CipherGBA_Core CipherGBA_Core_Static CipherGBA_PersistenceSmoke CipherGBA_CpuPhaseSmoke -j 2
+      - name: Test save and battery durability
+        run: build-mac/persistence-tools/CipherGBA_PersistenceSmoke build-mac/persistence-checks
+      - name: Thumb CPU I/O and HBlank phase regression
+        run: build-mac/persistence-tools/CipherGBA_CpuPhaseSmoke
+      - name: CLI sanity
+        run: bin/CipherGBA.app/Contents/MacOS/CipherGBA --help && bin/CipherGBA.app/Contents/MacOS/CipherGBA --version
+      - name: Synthetic raw and ZIP ROM smoke
+        run: python3 .github/scripts/check_rom_loading.py bin/CipherGBA.app/Contents/MacOS/CipherGBA
+      - name: Headless SDL2 gameplay loop smoke
+        run: |
+          python3 .github/scripts/create_smoke_rom.py build-mac/smoke.gba
+          SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
+            bin/CipherGBA.app/Contents/MacOS/CipherGBA \
+              --rom build-mac/smoke.gba --smoke-frames 90
+      - name: Install macOS app bundle
+        timeout-minutes: 3
+        run: |
+          echo 'Starting CMake install'
+          cmake --install build-mac --prefix "$PWD/dist/macOS"
+          echo 'CMake install complete'
+          test -f dist/macOS/CipherGBA.app/Contents/MacOS/CipherGBA
+      - name: Bundle macOS runtime dependencies
+        timeout-minutes: 3
+        run: |
+          echo 'Starting macOS dylib packaging'
+          bash -x packaging/macos/bundle-macos.sh "$PWD/dist/macOS/CipherGBA.app"
+          echo 'macOS dylib packaging complete'
+      - name: Validate macOS packaged app
+        timeout-minutes: 2
+        run: |
+          app="$PWD/dist/macOS/CipherGBA.app"
+          codesign --verify --deep --strict "$app"
+          test -n "$(find "$app/Contents/Frameworks" -type f -name '*.dylib' -print -quit)"
+          otool -L "$app/Contents/MacOS/CipherGBA"
+          if otool -L "$app/Contents/MacOS/CipherGBA" | grep -E '/opt/homebrew/|/usr/local/Cellar/'; then
+            echo 'Unbundled Homebrew library reference remains' >&2
+            exit 1
+          fi
+      - name: Package signed app with macOS metadata and executable permissions
+        run: |
+          archive="$PWD/CipherGBA-v0.1-macOS-${{ matrix.arch }}-CI.zip"
+          (cd dist/macOS && ditto -c -k --sequesterRsrc --keepParent CipherGBA.app "$archive")
+          mkdir -p "$RUNNER_TEMP/ciphergba-package-check"
+          ditto -x -k "$archive" "$RUNNER_TEMP/ciphergba-package-check"
+          test -x "$RUNNER_TEMP/ciphergba-package-check/CipherGBA.app/Contents/MacOS/CipherGBA"
+          codesign --verify --deep --strict "$RUNNER_TEMP/ciphergba-package-check/CipherGBA.app"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CipherGBA-v0.1-macOS-${{ matrix.arch }}-CI
+          path: CipherGBA-v0.1-macOS-${{ matrix.arch }}-CI.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  windows-sdl2:
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-SDL2
+            mingw-w64-ucrt-x86_64-zlib
+            mingw-w64-ucrt-x86_64-python
+      - name: Configure
+        run: cmake -S . -B build-win -G Ninja -DCMAKE_BUILD_TYPE=Release -DCIPHERGBA_FRONTEND=SDL2 -DPIXELGBA_ENABLE_LTO=OFF -DCIPHERGBA_BUILD_PERSISTENCE_SMOKE=ON
+      - name: Build
+        run: cmake --build build-win --target CipherGBA CipherGBA_PersistenceSmoke CipherGBA_CpuPhaseSmoke -j 2
+      - name: Inspect Windows synthetic regression dependencies
+        run: |
+          echo "Compiled persistence regression:"
+          ls -lh build-win/persistence-tools/CipherGBA_PersistenceSmoke.exe
+          echo "MSYS2 runtime path: $PATH"
+          echo "Imported Windows DLL dependencies:"
+          objdump -p build-win/persistence-tools/CipherGBA_PersistenceSmoke.exe | grep "DLL Name:" || true
+          echo "Dynamic dependency resolution:"
+          ldd build-win/persistence-tools/CipherGBA_PersistenceSmoke.exe || true
+      - name: Test save and battery durability
+        run: build-win/persistence-tools/CipherGBA_PersistenceSmoke.exe build-win/persistence-checks
+      - name: Thumb CPU I/O and HBlank phase regression
+        run: build-win/persistence-tools/CipherGBA_CpuPhaseSmoke.exe
+      - name: CLI sanity
+        run: bin/CipherGBA.exe --help && bin/CipherGBA.exe --version
+      - name: Synthetic raw and ZIP ROM smoke
+        run: python .github/scripts/check_rom_loading.py bin/CipherGBA.exe
+      - name: Headless SDL2 gameplay loop smoke
+        run: |
+          python .github/scripts/create_smoke_rom.py build-win/smoke.gba
+          SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
+            bin/CipherGBA.exe --rom build-win/smoke.gba --smoke-frames 90
+      - name: Stage Windows EXE and required DLLs
+        run: bash packaging/windows/package-windows.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CipherGBA-v0.1-Windows-x64-CI
+          path: dist/CipherGBA-v0.1-Windows-x64-CI/
+          if-no-files-found: error
+          retention-days: 14
+
+  linux-appimage:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential libsdl2-dev zlib1g-dev libdbus-1-dev libfuse2
+      - name: Download linuxdeploy tool
+        run: |
+          mkdir -p build-appimage
+          curl --fail --location --retry 3 \
+            -o build-appimage/linuxdeploy-x86_64.AppImage \
+            https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          chmod +x build-appimage/linuxdeploy-x86_64.AppImage
+      - name: Build AppImage (CI artifact)
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: |
+          export LINUXDEPLOY="$PWD/build-appimage/linuxdeploy-x86_64.AppImage"
+          bash packaging/appimage/build-appimage.sh
+          ls -lh ./*.AppImage
+          app="$(find . -maxdepth 1 -name '*.AppImage' -print -quit)"
+          test -n "$app"
+          APPIMAGE_EXTRACT_AND_RUN=1 "$app" --version
+          python3 .github/scripts/create_smoke_rom.py build-appimage/smoke.gba
+          APPIMAGE_EXTRACT_AND_RUN=1 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
+            timeout 45s "$app" --rom build-appimage/smoke.gba --smoke-frames 90
+          python3 .github/scripts/check_battery_persistence.py "$app"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CipherGBA-v0.1-AppImage-x86_64-CI
+          path: "*.AppImage"
+          if-no-files-found: error
+          retention-days: 14
+
+  linux-flatpak:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Flatpak Builder
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder
+          flatpak --user remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+      - name: Install freedesktop SDK and runtime
+        run: |
+          flatpak --user install -y --noninteractive flathub org.freedesktop.Sdk//25.08 org.freedesktop.Platform//25.08
+      - name: Build Flatpak from current source
+        run: |
+          flatpak-builder --force-clean --repo=flatpak-repo \
+            flatpak-build packaging/flatpak/io.github.hodgkinsstudios.CipherGBA.json
+      - name: Generate dev Flatpak bundle
+        run: |
+          mkdir -p dist
+          flatpak build-bundle flatpak-repo \
+            dist/CipherGBA-v0.1-Linux-Flatpak-CI.flatpak \
+            io.github.hodgkinsstudios.CipherGBA \
+            --runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak --user install -y --noninteractive --bundle \
+            dist/CipherGBA-v0.1-Linux-Flatpak-CI.flatpak
+          flatpak --user run io.github.hodgkinsstudios.CipherGBA --version
+          appdata="$HOME/.var/app/io.github.hodgkinsstudios.CipherGBA/data"
+          mkdir -p "$appdata"
+          python3 .github/scripts/create_smoke_rom.py "$appdata/smoke.gba"
+          timeout 60s flatpak --user run --env=SDL_VIDEODRIVER=dummy \
+            --env=SDL_AUDIODRIVER=dummy io.github.hodgkinsstudios.CipherGBA \
+            --rom "$appdata/smoke.gba" --smoke-frames 90
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CipherGBA-v0.1-Flatpak-CI
+          path: dist/*.flatpak
+          if-no-files-found: error
+          retention-days: 14
+  release-assets:
+    name: Validate consolidated v0.1 release packages
+    runs-on: ubuntu-24.04
+    needs:
+      - source-archive
+      - linux-x11
+      - linux-sdl2
+      - macos-sdl2
+      - windows-sdl2
+      - linux-appimage
+      - linux-flatpak
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: ci-artifacts
+      - name: Build exact source archive
+        run: git archive --format=zip --output CipherGBA-v0.1-Source.zip HEAD
+      - name: Assemble, inspect and checksum all seven platform/source packages
+        run: |
+          python3 packaging/release/assemble.py \
+            --artifacts ci-artifacts \
+            --source CipherGBA-v0.1-Source.zip \
+            --output dist --commit "$GITHUB_SHA"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CipherGBA-v0.1-RELEASE-ASSETS
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30

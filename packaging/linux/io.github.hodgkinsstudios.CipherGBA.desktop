@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=CipherGBA
+Comment=Game Boy Advance emulator by HodgkinsStudios
+Exec=CipherGBA
+Icon=io.github.hodgkinsstudios.CipherGBA
+Terminal=false
+Categories=Game;Emulator;
+Keywords=GBA;Game Boy Advance;Emulator;
+StartupNotify=true

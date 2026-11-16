@@ -1,0 +1,62 @@
+name: Publish CipherGBA v0.1
+
+# Manually publish only after the main branch has a successful full-platform CI run.
+on:
+  workflow_dispatch:
+
+jobs:
+  publish-release:
+    if: github.repository == 'HodgkinsStudios/CipherGBA' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Find successful CI build for current main commit
+        id: candidate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          run_id=$(gh run list -R "$GITHUB_REPOSITORY" --workflow portability.yml \
+            --branch main --limit 30 --json databaseId,headSha,status,conclusion \
+            | jq -r --arg sha "$GITHUB_SHA" \
+              '[.[] | select(.headSha == $sha and .status == "completed" and .conclusion == "success")][0].databaseId // empty')
+          test -n "$run_id" || { echo 'No successful cross-platform CI build on main for this commit'; exit 1; }
+          echo "id=$run_id" >> "$GITHUB_OUTPUT"
+          echo "Matched validated CI run $run_id"
+      - name: Download release assets from exact passing commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p dist
+          gh run download "${{ steps.candidate.outputs.id }}" -R "$GITHUB_REPOSITORY" \
+            --name CipherGBA-v0.1-RELEASE-ASSETS --dir dist
+      - name: Check checksums and all required builds
+        run: |
+          cd dist
+          sha256sum --check SHA256SUMS.txt
+          test -s CipherGBA-v0.1-ALL-PLATFORMS.zip
+          test -s CipherGBA-v0.1-Windows-x64.zip
+          test -s CipherGBA-v0.1-Linux-X11-x86_64.zip
+          test -s CipherGBA-v0.1-Linux-x86_64.AppImage
+          test -s CipherGBA-v0.1-Linux-x86_64.flatpak
+          test -s CipherGBA-v0.1-macOS-arm64.zip
+          test -s CipherGBA-v0.1-macOS-x86_64.zip
+          test -s CipherGBA-v0.1-Source.zip
+      - name: Publish immutable GitHub release v0.1.0
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view v0.1.0 -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'v0.1.0 already exists; refusing to overwrite release assets' >&2
+            exit 1
+          fi
+          gh release create v0.1.0 dist/* -R "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" --title 'CipherGBA v0.1' \
+            --notes-file RELEASE_NOTES.md
+          gh release view v0.1.0 -R "$GITHUB_REPOSITORY" \
+            --json tagName,url,assets --jq '{tag: .tagName, url: .url, files: [.assets[].name]}'

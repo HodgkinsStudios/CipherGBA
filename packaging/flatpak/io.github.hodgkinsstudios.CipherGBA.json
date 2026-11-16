@@ -1,0 +1,35 @@
+{
+  "app-id": "io.github.hodgkinsstudios.CipherGBA",
+  "runtime": "org.freedesktop.Platform",
+  "runtime-version": "25.08",
+  "sdk": "org.freedesktop.Sdk",
+  "command": "CipherGBA",
+  "finish-args": [
+    "--share=ipc",
+    "--socket=x11",
+    "--socket=wayland",
+    "--device=dri",
+    "--socket=pulseaudio",
+    "--filesystem=xdg-documents:ro",
+    "--filesystem=xdg-download:ro"
+  ],
+  "modules": [
+    {
+      "name": "ciphergba",
+      "buildsystem": "cmake-ninja",
+      "config-opts": [
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DCIPHERGBA_FRONTEND=SDL2",
+        "-DCIPHERGBA_NATIVE_TUNING=OFF",
+        "-DPIXELGBA_ENABLE_LTO=OFF",
+        "-DCIPHERGBA_RESIZE_INSTALL_ICON=ON"
+      ],
+      "sources": [
+        {
+          "type": "dir",
+          "path": "../.."
+        }
+      ]
+    }
+  ]
+}

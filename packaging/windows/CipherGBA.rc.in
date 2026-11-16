@@ -1,0 +1,2 @@
+// Windows executable icon resource, generated during v0.1 configure.
+1 ICON "@CIPHERGBA_OS_ICON_RC@"

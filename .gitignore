@@ -1,0 +1,49 @@
+# CMake and Code::Blocks generated files
+/build/
+/build-*/
+/build_*/
+/cmake-build-*/
+/obj/
+/bin/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+*.cbp.user
+*.depend
+*.layout
+# Generated binaries, local execution and debug output
+*.o
+*.a
+*.so
+*.so.*
+*.dll
+*.exe
+*.dSYM/
+*.log
+*.tmp
+__pycache__/
+*.py[cod]
+# Private or user-provided cartridge, firmware and save data
+*.gba
+*.gb
+*.gbc
+*.bios
+*.bin
+*.sav
+*.srm
+*.zip
+*.7z
+*.avi
+CipherGBA_Data/
+test-output/
+results/
+records/
+screenshots/
+
+# Cross-platform packaging outputs (never commit generated artifacts)
+/dist/
+/flatpak-build/
+/flatpak-repo/
+/.flatpak-builder/
+*.AppImage
+*.flatpak

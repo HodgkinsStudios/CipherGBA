@@ -1,0 +1,60 @@
+# CipherGBA v0.1 development: portable core, selectable desktop frontends.
+cmake_minimum_required(VERSION 3.16)
+project(CipherGBA VERSION 0.1.0 LANGUAGES C CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+option(PIXELGBA_ENABLE_LTO "Enable link-time optimization in Release builds" ON)
+if(PIXELGBA_ENABLE_LTO)
+    include(CheckIPOSupported)
+    check_ipo_supported(RESULT PIXELGBA_HAS_IPO OUTPUT PIXELGBA_IPO_REASON)
+    if(PIXELGBA_HAS_IPO)
+        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE TRUE)
+        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO TRUE)
+    else()
+        message(STATUS "LTO unavailable: ${PIXELGBA_IPO_REASON}")
+    endif()
+endif()
+find_package(ZLIB REQUIRED)
+option(PIXELGBA_BUILD_GUI "Build the desktop frontend" ON)
+set(CIPHERGBA_FRONTEND "AUTO" CACHE STRING "Desktop frontend: AUTO, X11, SDL2, NONE")
+set_property(CACHE CIPHERGBA_FRONTEND PROPERTY STRINGS AUTO X11 SDL2 NONE)
+string(TOUPPER "${CIPHERGBA_FRONTEND}" CIPHERGBA_SELECTED_FRONTEND)
+if(NOT PIXELGBA_BUILD_GUI)
+    set(CIPHERGBA_SELECTED_FRONTEND NONE)
+elseif(CIPHERGBA_SELECTED_FRONTEND STREQUAL "AUTO")
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        set(CIPHERGBA_SELECTED_FRONTEND X11)
+    else()
+        set(CIPHERGBA_SELECTED_FRONTEND SDL2)
+    endif()
+endif()
+if(NOT CIPHERGBA_SELECTED_FRONTEND MATCHES "^(X11|SDL2|NONE)$")
+    message(FATAL_ERROR "CIPHERGBA_FRONTEND must be AUTO, X11, SDL2 or NONE")
+endif()
+if(CIPHERGBA_SELECTED_FRONTEND STREQUAL "X11" AND NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    message(FATAL_ERROR "The legacy X11 frontend currently supports Linux only. Use SDL2 on this platform.")
+endif()
+message(STATUS "CipherGBA frontend: ${CIPHERGBA_SELECTED_FRONTEND}")
+add_subdirectory(CipherGBA_Core)
+add_subdirectory(CipherGBA_Frontend)
+
+# Optional synthetic battery/save-state regression, disabled for release builds.
+option(CIPHERGBA_BUILD_PERSISTENCE_SMOKE "Build CI battery/state regression" OFF)
+if(CIPHERGBA_BUILD_PERSISTENCE_SMOKE)
+    add_executable(CipherGBA_PersistenceSmoke .github/scripts/core_persistence_smoke.cpp)
+    target_include_directories(CipherGBA_PersistenceSmoke PRIVATE
+        "${PROJECT_SOURCE_DIR}/CipherGBA_Core/include"
+        "${PROJECT_SOURCE_DIR}/CipherGBA_Frontend/src")
+    target_link_libraries(CipherGBA_PersistenceSmoke PRIVATE
+        CipherGBA_Core_Static ZLIB::ZLIB ${CMAKE_DL_LIBS})
+    set_target_properties(CipherGBA_PersistenceSmoke PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/persistence-tools")
+    # ROM-free ARM7TDMI Thumb peripheral timing regression.
+    add_executable(CipherGBA_CpuPhaseSmoke .github/scripts/cpu_io_phase_smoke.cpp)
+    target_include_directories(CipherGBA_CpuPhaseSmoke PRIVATE
+        "${PROJECT_SOURCE_DIR}/CipherGBA_Core/include")
+    target_link_libraries(CipherGBA_CpuPhaseSmoke PRIVATE
+        CipherGBA_Core_Static ZLIB::ZLIB ${CMAKE_DL_LIBS})
+    set_target_properties(CipherGBA_CpuPhaseSmoke PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/persistence-tools")
+endif()
