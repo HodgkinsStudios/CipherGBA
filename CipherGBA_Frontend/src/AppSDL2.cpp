@@ -931,7 +931,9 @@ struct Application {
     }
     void uiText(const std::string& title,int x,int y,int scale=2,
                 SDL_Color color={226,236,250,255}){
-        ciphergba_about::text(renderer,title,x,y,scale*uiScale(),color);
+        std::string upper=title;
+        for(char& c:upper)c=static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+        ciphergba_about::text(renderer,upper,x,y,scale*uiScale(),color);
     }
     void uiButton(int x,int y,int w,int h,const std::string& title,bool primary=false){
         const int sc=uiScale();x*=sc;y*=sc;w*=sc;h*=sc;
