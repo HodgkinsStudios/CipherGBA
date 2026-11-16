@@ -121,6 +121,10 @@ jobs:
           python3 .github/scripts/create_smoke_rom.py build-sdl/smoke.gba
           SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
             timeout 45s bin/CipherGBA --rom build-sdl/smoke.gba --smoke-frames 90
+      - name: No-ROM CP93 frontend startup and render smoke
+        run: |
+          SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
+            timeout 20s bin/CipherGBA --ui-smoke-frames 20
       - name: Verify non-destructive v0.1 data migration, repeated imports and filter
         run: python3 .github/scripts/check_legacy_migration.py bin/CipherGBA build-sdl/smoke.gba
       - name: Verify SRAM persistence across restarts
