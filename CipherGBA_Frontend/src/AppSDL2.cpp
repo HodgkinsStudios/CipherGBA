@@ -1038,13 +1038,35 @@ struct Application {
         uiFill((margin+28)*sc,(y+449)*sc,(left-56)*sc,sc,{72,104,132,255});
         uiText(core.biosLoaded()?"ORIGINAL BIOS INSTALLED":"HLE MODE ACTIVE",
                (margin+left/2)*sc,(y+481)*sc,1,{163,220,192,255});
-        uiText("EMU SYSTEM  /  STATUS",(rx+right/2)*sc,(y+61)*sc,2,{102,196,255,255});
-        const char* features[]={"ARM7TDMI EMULATION","GBA AUDIO AND VIDEO","CARTRIDGE AND ZIP LOADING",
-                                "SAVE STATES  /  CHEATS","INPUT MOVIES AND AVI","GAMEPAD AUTO DETECTION"};
-        for(int i=0;i<6;++i){
-            uiFill((rx+25)*sc,(y+116+i*59)*sc,(right-50)*sc,44*sc,{28,54,74,255});
-            uiText(features[i],(rx+right/2)*sc,(y+131+i*59)*sc,1);
+        // CP93 abstract handheld/toolkit graphic, composed from SDL rectangles.
+        // It is not the project branding image and is never a splash screen.
+        const int deviceW=std::min(294,right-48);
+        const int dx=rx+right/2-deviceW/2,dy=y+42;
+        uiFill(dx*sc,dy*sc,deviceW*sc,225*sc,{40,68,89,255});
+        uiFill((dx+15)*sc,(dy+15)*sc,(deviceW-30)*sc,150*sc,{7,18,28,255});
+        uiFill((dx+25)*sc,(dy+25)*sc,(deviceW-50)*sc,130*sc,{17,48,70,255});
+        for(int i=0;i<14;++i){
+            const int bx=dx+41+i*(deviceW-82)/14;
+            const int bh=16+((i*17+9)%37);
+            uiFill(bx*sc,(dy+102-bh/2)*sc,7*sc,bh*sc,
+                   i%3==0?SDL_Color{255,214,92,255}:SDL_Color{102,196,255,255});
         }
+        uiFill((dx+30)*sc,(dy+183)*sc,44*sc,17*sc,{13,20,33,255});
+        uiFill((dx+44)*sc,(dy+169)*sc,17*sc,44*sc,{13,20,33,255});
+        uiFill((dx+deviceW-91)*sc,(dy+179)*sc,23*sc,23*sc,{255,214,92,255});
+        uiFill((dx+deviceW-59)*sc,(dy+196)*sc,23*sc,23*sc,{255,214,92,255});
+        uiText("GBA TOOLKIT",(rx+right/2)*sc,(y+313)*sc,2,{102,196,255,255});
+        uiText("240 X 160 / NATIVE C++ / SDL2",
+               (rx+right/2)*sc,(y+354)*sc,1,{185,213,232,255});
+        uiFill((rx+25)*sc,(y+380)*sc,(right-50)*sc,sc,{72,104,132,255});
+        uiText("SAVE STATES / TAS / CHEATS",
+               (rx+right/2)*sc,(y+402)*sc,1,{197,210,230,255});
+        uiText("SCREENSHOTS / VIDEO CAPTURE",
+               (rx+right/2)*sc,(y+437)*sc,1,{197,210,230,255});
+        uiText("GAMESHARK / CODEBREAKER",
+               (rx+right/2)*sc,(y+472)*sc,1,{197,210,230,255});
+        uiFill((rx+25)*sc,(y+516)*sc,175*sc,30*sc,{26,66,62,255});
+        uiText("READY TO PLAY",(rx+112)*sc,(y+524)*sc,1,{156,219,197,255});
     }
     void uiDrawInput(int w,int h){
         const int sc=uiScale(),cw=w/sc,ch=h/sc;
