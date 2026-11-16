@@ -180,7 +180,7 @@ class App {
     struct TasFrame {std::uint16_t buttons=0;};
     Paths paths_;GbaCore core_;Bindings bindings_{},editing_{};Joystick joystick_;
     host::SdlAudio audio_;host::AviRecorder avi_;
-    Display* dpy_=nullptr;Window win_=0;GC gc_=0;Pixmap back_=0;XFontStruct* font_=nullptr;
+    Display* dpy_=nullptr;Window win_=0;GC gc_=0;Pixmap back_=0;XFontStruct* font_=nullptr;XFontStruct* titleFont_=nullptr;XFontStruct* mediumFont_=nullptr;
     // Reusable XImage avoids allocating/destroying a ~2.5MB image on every frame.
     XImage* scaledImage_=nullptr;
     // X11 MIT-SHM is optional; dynamic libXext lookup keeps public builds
@@ -436,6 +436,8 @@ public:
     }
     ~App(){avi_.stop();if(dpy_){destroyScaledImage();if(back_)XFreePixmap(dpy_,back_);if(gc_)XFreeGC(dpy_,gc_);
         if(font_)XFreeFont(dpy_,font_);
+        if(titleFont_)XFreeFont(dpy_,titleFont_);
+        if(mediumFont_)XFreeFont(dpy_,mediumFont_);
         if(win_)XDestroyWindow(dpy_,win_);
         XCloseDisplay(dpy_);}if(xext_)dlclose(xext_);}
     int run(int argc,char** argv){
@@ -454,6 +456,8 @@ public:
         gc_=XCreateGC(dpy_,win_,0,nullptr);XSetGraphicsExposures(dpy_,gc_,False);
         font_=XLoadQueryFont(dpy_,"-*-helvetica-bold-r-normal--18-*-*-*-*-*-iso8859-1");
         if(!font_)font_=XLoadQueryFont(dpy_,"9x15");
+        titleFont_=XLoadQueryFont(dpy_,"-*-helvetica-bold-r-normal--38-*-*-*-*-*-iso8859-1");
+        mediumFont_=XLoadQueryFont(dpy_,"-*-helvetica-bold-r-normal--20-*-*-*-*-*-iso8859-1");
         if(font_)XSetFont(dpy_,gc_,font_->fid);
         XSizeHints sh{};sh.flags=PMinSize;sh.min_width=950;sh.min_height=770;XSetWMNormalHints(dpy_,win_,&sh);
         XkbSetDetectableAutoRepeat(dpy_,True,nullptr);XMapWindow(dpy_,win_);resize(w_,h_);
@@ -737,6 +741,18 @@ private:
         XPutImage(dpy_,back_,gc_,img,0,0,left,top,unsigned(width),unsigned(height));
         XDestroyImage(img);
     }
+    void largeLabel(int x,int base,const std::string& t,unsigned long c){
+        XSetForeground(dpy_,gc_,c);
+        if(titleFont_)XSetFont(dpy_,gc_,titleFont_->fid);
+        XDrawString(dpy_,back_,gc_,x,base,t.c_str(),int(t.size()));
+        if(font_)XSetFont(dpy_,gc_,font_->fid);
+    }
+    void mediumLabel(int x,int base,const std::string& t,unsigned long c){
+        XSetForeground(dpy_,gc_,c);
+        if(mediumFont_)XSetFont(dpy_,gc_,mediumFont_->fid);
+        XDrawString(dpy_,back_,gc_,x,base,t.c_str(),int(t.size()));
+        if(font_)XSetFont(dpy_,gc_,font_->fid);
+    }
     void color(unsigned long c){XSetForeground(dpy_,gc_,c);}
     void rect(int x,int y,int w,int h,unsigned long c){if(w<1||h<1)return;color(c);XFillRectangle(dpy_,back_,gc_,x,y,unsigned(w),unsigned(h));}
     void stroke(int x,int y,int w,int h,unsigned long c){if(w<1||h<1)return;color(c);XDrawRectangle(dpy_,back_,gc_,x,y,unsigned(w-1),unsigned(h-1));}
@@ -756,8 +772,8 @@ private:
         rect(rx,top,right,cardH,0x122135);stroke(rx,top,right,cardH,0x426b8d);
         rect(margin+28,top+31,60,4,0x66c4ff);
         label(margin+28,top+73,"HODGKINSSTUDIOS / GAME BOY ADVANCE",0xffd65c);
-        label(margin+28,top+137,"CipherGBA",0x66c4ff);
-        label(margin+28,top+176,"YOUR GBA LIBRARY",0xf1f6fc);
+        largeLabel(margin+28,top+137,"CipherGBA",0x66c4ff);
+        mediumLabel(margin+28,top+176,"YOUR GBA LIBRARY",0xf1f6fc);
         label(margin+28,top+219,"A precise Game Boy Advance experience",0xc0d7e8);
         label(margin+28,top+246,"with the tools you need to play.",0xc0d7e8);
         button(margin+28,top+285,left-56,58,"Open ROM (.gba / .zip)",true);
@@ -767,14 +783,29 @@ private:
         rect(margin+28,top+449,left-56,1,0x486984);
         label(margin+28,top+482,
               core_.biosLoaded()?"ORIGINAL BIOS INSTALLED":"HLE MODE ACTIVE",0x9cdbc5);
-        label(rx+25,top+73,"EMU SYSTEM / STATUS",0x66c4ff);
-        const char* features[]={"ARM7TDMI emulation","GBA audio and video",
-            "ROM and ZIP loading","Save states and cheat codes",
-            "TAS movies and AVI capture","Auto gamepad support"};
-        for(int i=0;i<6;++i){
-            rect(rx+25,top+116+i*59,right-50,44,0x1c364a);
-            label(rx+37,top+144+i*59,features[i],0xe4edfa);
+        // CP93 vector GBA toolkit emblem (not the application logo).
+        const int cx=rx+right/2,deviceW=std::min(294,right-48);
+        const int dx=cx-deviceW/2,dy=top+42;
+        rect(dx,dy,deviceW,225,0x284459);
+        rect(dx+15,dy+15,deviceW-30,150,0x07121c);
+        rect(dx+25,dy+25,deviceW-50,130,0x113046);
+        for(int i=0;i<14;++i){
+            const int bx=dx+41+i*(deviceW-82)/14;
+            const int bh=16+((i*17+9)%37);
+            rect(bx,dy+102-bh/2,7,bh,i%3==0?0xffd65c:0x66c4ff);
         }
+        rect(dx+30,dy+183,44,17,0x0d1421);
+        rect(dx+44,dy+169,17,44,0x0d1421);
+        rect(dx+deviceW-91,dy+179,23,23,0xffd65c);
+        rect(dx+deviceW-59,dy+196,23,23,0xffd65c);
+        mediumLabel(rx+25,top+313,"GBA TOOLKIT",0x66c4ff);
+        label(rx+25,top+354,"240 x 160 / NATIVE C++ / X11",0xb9d5e8);
+        rect(rx+25,top+380,right-50,1,0x486984);
+        label(rx+25,top+416,"SAVE STATES / TAS / CHEATS",0xc5d2e6);
+        label(rx+25,top+451,"SCREENSHOTS / VIDEO CAPTURE",0xc5d2e6);
+        label(rx+25,top+486,"GAMESHARK / CODEBREAKER",0xc5d2e6);
+        rect(rx+25,top+516,175,30,0x1a423e);
+        label(rx+37,top+537,"READY TO PLAY",0x9cdbc5);
     }
     void renderFrame(){
         if(!core_.cartridge().loaded()){drawNoRomDashboard();return;}
@@ -1073,6 +1104,10 @@ private:
         if(panel_!=Game&&y>=Bar){panelClick(x,y);return;}
         if(y<Bar){int chosen=-1;for(unsigned i=0;i<menus_.size();i++)if(x>=rootX(i)&&x<rootX(i)+rootWidth(i)){chosen=int(i);break;}
             if(chosen>=0){if(menu_==chosen){menu_=-1;submenu_=-1;}else{menu_=chosen;submenu_=-1;hover_=-1;}}
+            else if(w_>=1060 && x>=w_-222 && x<w_-173){menu_=-1;execute(Screenshot);}
+            else if(w_>=1060 && x>=w_-167 && x<w_-20){
+                menu_=-1;if(core_.cartridge().loaded())execute(Pause);else execute(LoadRom);
+            }
             else{menu_=-1;submenu_=-1;}dirty_=true;return;}
         if(menu_>=0){
             const int left=rootX(menu_),width=dropdownWidth(menu_);
