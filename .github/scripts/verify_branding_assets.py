@@ -21,6 +21,14 @@ def main():
     check(channels==3,'Canonical input should be high-resolution RGB PNG')
     readme=(ROOT/'README.md').read_text(encoding='utf-8')
     check('assets/branding/ciphergba_icon.png' in readme,'README does not use canonical artwork')
+    sdl=(ROOT/'CipherGBA_Frontend/src/AppSDL2.cpp').read_text(encoding='utf-8')
+    check('void uiDrawChrome(int w,int h)' in sdl,'Portable frontend menu bar is absent')
+    check('uiDrawNoRom(w,top,bottom);' in sdl,'No-ROM frontend screen is absent')
+    check('if(chrome)uiDrawChrome(w,h);' in sdl,'Frontend menu bar is not rendered')
+    render=sdl.split('    void render(){',1)[1].split('    int loop(',1)[0]
+    check('kAboutArtwork' not in render,'About artwork must never replace the main UI')
+    check('app.mainMenu();' not in sdl.split('int main(int argc,char** argv){',1)[1],
+          'Main window startup must not hide behind a modal popup')
     for old in ('ciphergba_logo.png','ciphergba_readme_banner.png'):
         check(not (ROOT/'assets/branding'/old).exists(),'Old branding asset retained: '+old)
         check(old not in readme,'README references retired branding: '+old)
