@@ -1,12 +1,29 @@
 name: Publish CipherGBA v0.1
 
-# Manually publish only after the main branch has a successful full-platform CI run.
+# Publish from a fully successful, main-branch full-platform CI run.
+# workflow_dispatch stays available for manual retries.
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ["v0.1 portability builds"]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: ciphergba-release-v0.1.0
+  cancel-in-progress: false
 
 jobs:
   publish-release:
-    if: github.repository == 'HodgkinsStudios/CipherGBA' && github.ref == 'refs/heads/main'
+    if: >-
+      github.repository == 'HodgkinsStudios/CipherGBA' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'workflow_run' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        github.event.workflow_run.head_sha == github.sha))
     runs-on: ubuntu-24.04
     permissions:
       actions: read
