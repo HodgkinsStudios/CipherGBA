@@ -113,6 +113,11 @@ struct Application {
         SDL_CONTROLLER_BUTTON_RIGHTSHOULDER,SDL_CONTROLLER_BUTTON_LEFTSHOULDER}};
     KeyMap keyMap_=defaultKeys_,oldKeyMap_=defaultKeys_;
     PadMap padMap_=defaultPad_,oldPadMap_=defaultPad_;
+    // CP93 exposed fast-forward as the eleventh remappable action.
+    // It is host-side only and does not change the GBA core button mask.
+    SDL_Scancode fastKey_=SDL_SCANCODE_TAB,oldFastKey_=SDL_SCANCODE_TAB;
+    SDL_GameControllerButton fastPad_=SDL_CONTROLLER_BUTTON_INVALID;
+    SDL_GameControllerButton oldFastPad_=SDL_CONTROLLER_BUTTON_INVALID;
 
     int stateSlot=1;
     int uiMenu_=-1, uiMouseX_=-1, uiMouseY_=-1;
@@ -330,9 +335,10 @@ struct Application {
         if(ec){message("Cannot create input configuration directory: "+ec.message());return false;}
         std::ofstream out(bindingsFile(),std::ios::trunc);
         if(!out){message("Cannot open input configuration for writing");return false;}
-        out<<"CipherGBA_SDL_INPUT_V1\n";
+        out<<"CipherGBA_SDL_INPUT_V2\n";
         for(unsigned i=0;i<10;i++)
             out<<static_cast<int>(keyMap_[i])<<' '<<static_cast<int>(padMap_[i])<<'\n';
+        out<<static_cast<int>(fastKey_)<<' '<<static_cast<int>(fastPad_)<<'\n';
         out.flush();out.close();
         if(!out){message("Input configuration write failed");return false;}
         return true;
@@ -341,7 +347,7 @@ struct Application {
         std::ifstream in(bindingsFile());
         if(!in)return;
         std::string magic;
-        if(!(in>>magic)||magic!="CipherGBA_SDL_INPUT_V1")return;
+        if(!(in>>magic) || (magic!="CipherGBA_SDL_INPUT_V1" && magic!="CipherGBA_SDL_INPUT_V2"))return;
         KeyMap newKeys=defaultKeys_;
         PadMap newPad=defaultPad_;
         for(unsigned i=0;i<10;i++){
@@ -351,11 +357,20 @@ struct Application {
             newKeys[i]=static_cast<SDL_Scancode>(key);
             newPad[i]=static_cast<SDL_GameControllerButton>(pad);
         }
-        keyMap_=newKeys;padMap_=newPad;
+        SDL_Scancode newFastKey=SDL_SCANCODE_TAB;
+        SDL_GameControllerButton newFastPad=SDL_CONTROLLER_BUTTON_INVALID;
+        if(magic=="CipherGBA_SDL_INPUT_V2"){
+            int fk=0,fp=0;
+            if(!(in>>fk>>fp)||fk<0||fk>=SDL_NUM_SCANCODES||
+               fp<-1||fp>=SDL_CONTROLLER_BUTTON_MAX)return;
+            newFastKey=static_cast<SDL_Scancode>(fk);
+            newFastPad=static_cast<SDL_GameControllerButton>(fp);
+        }
+        keyMap_=newKeys;padMap_=newPad;fastKey_=newFastKey;fastPad_=newFastPad;
     }
     void mappingTitle(){
         std::string title="CipherGBA | Remap ";
-        title+=buttonNames_[remapIndex_];
+        title+=remapIndex_<10?buttonNames_[remapIndex_]:"FAST FORWARD";
         title+=remap_==RemapMode::Keyboard ?
             " keyboard: press key (Delete=unassign, Esc=cancel)":
             " gamepad: press controller button (Esc=cancel)";
@@ -896,6 +911,7 @@ struct Application {
     }
     void uiOpenInput(){
         oldKeyMap_=keyMap_;oldPadMap_=padMap_;
+        oldFastKey_=fastKey_;oldFastPad_=fastPad_;
         pausedBeforeInput_=paused;paused=true;
         remap_=RemapMode::None;uiPanel_=UiPanel::Input;
     }
@@ -904,6 +920,7 @@ struct Application {
             if(!saveBindings())return;
         }else{
             keyMap_=oldKeyMap_;padMap_=oldPadMap_;
+            fastKey_=oldFastKey_;fastPad_=oldFastPad_;
         }
         remap_=RemapMode::None;uiCaptureSingle_=false;
         uiPanel_=UiPanel::Game;paused=pausedBeforeInput_;
@@ -1134,14 +1151,14 @@ struct Application {
         uiText("ACTION",106*sc,217*sc,2);
         uiText("KEYBOARD",351*sc,217*sc,2);
         uiText("GAMEPAD",670*sc,217*sc,2);
-        const int rowHeight=std::max(26,std::min(34,(ch-366)/10));
-        for(int i=0;i<10;++i){
+        const int rowHeight=std::max(25,std::min(34,(ch-366)/11));
+        for(int i=0;i<11;++i){
             const int y=248+i*rowHeight;
             uiFill(32*sc,y*sc,(cw-64)*sc,(rowHeight-1)*sc,
                    i%2?SDL_Color{14,28,45,255}:SDL_Color{21,43,64,255});
-            uiText(buttonNames_[i],115*sc,(y+9)*sc,1);
-            const char* kn=SDL_GetScancodeName(keyMap_[i]);
-            const char* pn=SDL_GameControllerGetStringForButton(padMap_[i]);
+            uiText(i==10?"FAST FORWARD":buttonNames_[i],115*sc,(y+9)*sc,1);
+            const char* kn=SDL_GetScancodeName(i==10?fastKey_:keyMap_[i]);
+            const char* pn=SDL_GameControllerGetStringForButton(i==10?fastPad_:padMap_[i]);
             const std::string name=(kn&&*kn)?kn:"UNASSIGNED";
             const std::string pad=(pn&&*pn)?pn:"UNASSIGNED";
             uiButton(233,y+1,280,rowHeight-2,
@@ -1184,9 +1201,9 @@ struct Application {
         int w=0,h=0;SDL_GetRendererOutputSize(renderer,&w,&h);
         const int rw=w/sc,rh=h/sc;
         if(uiPanel_==UiPanel::Input){
-            const int rowHeight=std::max(26,std::min(34,(rh-366)/10));
+            const int rowHeight=std::max(25,std::min(34,(rh-366)/11));
             const int line=y/sc-248;
-            if(line>=0&&line<10*rowHeight){
+            if(line>=0&&line<11*rowHeight){
                 const int row=line/rowHeight;
                 if(uiWithin(x,y,233,248+row*rowHeight,280,rowHeight-1)){
                     remap_=RemapMode::Keyboard;remapIndex_=unsigned(row);
@@ -1200,7 +1217,9 @@ struct Application {
             }
             if(uiWithin(x,y,34,rh-113,145,47))uiCloseInput(true);
             else if(uiWithin(x,y,197,rh-113,245,47)){
-                keyMap_=defaultKeys_;padMap_=defaultPad_;remap_=RemapMode::None;
+                keyMap_=defaultKeys_;padMap_=defaultPad_;
+                fastKey_=SDL_SCANCODE_TAB;fastPad_=SDL_CONTROLLER_BUTTON_INVALID;
+                remap_=RemapMode::None;
             }else if(uiWithin(x,y,rw-191,rh-113,157,47))uiCloseInput(false);
         }else if(uiPanel_==UiPanel::Cheats){
             if(uiWithin(x,y,34,rh-114,187,45))cheatMenu();
@@ -1294,7 +1313,9 @@ struct Application {
         if(remap_==RemapMode::Gamepad && event.type==SDL_CONTROLLERBUTTONDOWN){
             if(controller && SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(controller))
                   ==event.cbutton.which){
-                padMap_[remapIndex_]=static_cast<SDL_GameControllerButton>(event.cbutton.button);
+                if(remapIndex_<10)
+                    padMap_[remapIndex_]=static_cast<SDL_GameControllerButton>(event.cbutton.button);
+                else fastPad_=static_cast<SDL_GameControllerButton>(event.cbutton.button);
                 finishMapping();
             }
             return;
@@ -1329,8 +1350,10 @@ struct Application {
                 return;
             }
             if(remap_==RemapMode::Keyboard){
-                keyMap_[remapIndex_]=key==SDLK_DELETE?SDL_SCANCODE_UNKNOWN:
-                    event.key.keysym.scancode;
+                if(remapIndex_<10)
+                    keyMap_[remapIndex_]=key==SDLK_DELETE?SDL_SCANCODE_UNKNOWN:
+                        event.key.keysym.scancode;
+                else fastKey_=key==SDLK_DELETE?SDL_SCANCODE_UNKNOWN:event.key.keysym.scancode;
                 finishMapping();
             }
             return;
@@ -1449,7 +1472,11 @@ struct Application {
             SDL_Event e{};
             while(SDL_PollEvent(&e))handleEvent(e);
             if(!running)break;
-            const bool fast=SDL_GetKeyboardState(nullptr)[SDL_SCANCODE_TAB]!=0;
+            const auto* keyboard=SDL_GetKeyboardState(nullptr);
+            const bool fast=(fastKey_!=SDL_SCANCODE_UNKNOWN && keyboard[fastKey_])||
+                (controller && SDL_GameControllerGetAttached(controller) &&
+                 fastPad_!=SDL_CONTROLLER_BUTTON_INVALID &&
+                 SDL_GameControllerGetButton(controller,fastPad_));
             const auto now=Clock::now();
             if(!paused && core.cartridge().loaded() && (fast || now>=next)){
                 const int runs=fast?4:1;
