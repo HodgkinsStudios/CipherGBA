@@ -18,7 +18,7 @@ CipherGBA emulates the Game Boy Advance using an independently maintained GBA co
 
 ### Desktop interface — CP93 design restored for v0.2
 
-Both frontend implementations follow the six-tab **Library / Settings / System / TAS / Cheats / Info** layout from the CP93 full source. Starting without a ROM shows the two-column library/dashboard with clickable **Open ROM**, **Import BIOS**, and **Configure Input** controls rather than displaying a giant logo. Input mapping has a dedicated in-window keyboard/gamepad table, and cheats have a dedicated management view. Menu groups expose display, audio, state, capture and input-movie features.
+Both frontend implementations follow the six-tab **Library / Settings / System / TAS / Cheats / Info** layout from the CP93 full source. Starting without a ROM shows the two-column library/dashboard with clickable **Open ROM**, **Import BIOS**, and **Configure Input** controls rather than displaying a giant logo. Input mapping has a dedicated in-window keyboard/gamepad table, and cheats have a dedicated management view. F1 opens the Library dropdown. Menu groups expose display, audio, state, capture and input-movie features.
 
 The native Linux X11 frontend uses Xlib; Windows, macOS and portable Linux builds render the corresponding interface using SDL2. Their dialog implementations, menus and feature depth are not yet visually or functionally identical in every detail. The original CP93 C++ core is **not** included: the current GBA core remains unchanged. See [the frontend migration notes](docs/FRONTEND_CP93.md) and [platform differences](docs/PLATFORMS.md).
 
