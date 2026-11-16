@@ -1,32 +1,29 @@
-# CipherGBA — v0.2 frontend platform validation checklist
+# CipherGBA v0.3 — cross-platform frontend acceptance checklist
 
-This document separates automated project checks from **manual testing still required**. The workflow only becomes evidence for a particular release commit after the corresponding GitHub Actions run completes successfully on `main`.
+**Reference:** native Linux X11 frontend of the user-supplied `CipherGBA-0.1.0.zip`. v0.3 is a frontend/release-packaging update; hardware core source is not modified.
 
-## Automated checks in the cross-platform workflow
+## Automated verification
 
-- Configure and compile native Linux X11 and portable SDL2 on Linux, Windows and both macOS architectures.
-- Validate consistent branding assets; inspect native packaged icons and macOS `.app` bundle/signature.
-- Run headless CLI/synthetic ROM boot tests where supported, including ZIP cartridge loading.
-- Run synthetic battery/save-state persistence, input/data import, CPU I/O timing and AVI tests where configured.
-- Build/check Linux AppImage and Flatpak packages; assemble release ZIPs; validate source archive and per-file SHA-256 checksums.
+- [ ] Build native Linux X11, Linux SDL2, Windows x64, macOS Intel, macOS ARM, AppImage and Flatpak from the same commit.
+- [ ] Run ROM-free SDL2 startup/render smoke test; main window opens without modal prompts or oversized branding.
+- [ ] Verify the seven-menu definitions and nested submenu labels match the original v0.1 source.
+- [ ] Run the synthetic ROM/persistence/AVI and other configured CI checks; verify release-package SHA-256 manifests.
+- [ ] Confirm the Git diff contains zero modified files under `CipherGBA_Core/`.
+- [ ] Confirm no fast-forward, rewind or CP93 dashboard UI controls remain.
 
-The 6,998-case private GBA test suite is **not** included in GitHub Actions and requires locally supplied test media. Automated package checks do not establish interactive desktop functionality.
+## Manual desktop acceptance on each OS
 
-## Manual release acceptance on each target OS
+- [ ] Launch from the final package; verify a **blank dark viewport** and compact `File / Input / Configure / System / TAS / Cheats / Help` bar, with a bottom status strip showing no ROM and the state slot.
+- [ ] Open every menu and submenu (GBA Controller; Emulator Speed; APU; Save State Slot), verify the original item order, separators, hover and checked indicators.
+- [ ] Click Input / Configure → Controller Input; remap, save, reset defaults and cancel; restart and confirm mappings persist.
+- [ ] In Cheats, add, toggle, remove and save a supported code; verify the page stays in the main window.
+- [ ] Open Help → Info; logo appears **only in About**, and Return returns to the original blank viewport or running game.
+- [ ] Load a legally obtained `.gba` and `.zip` using native file pickers; test optional original BIOS and HLE.
+- [ ] Play a game and test native aspect scaling, fullscreen, fullscreen stretched, frame pacing, audio channels, pause, mute, and restore to windowed.
+- [ ] Save and load state slots, battery saves, screenshots, TAS recording/playback and AVI output folder and capture.
+- [ ] Connect/disconnect/reconnect a keyboard and gamepad; test ten mapped buttons and OS-specific input capture.
+- [ ] Inspect macOS notarization warnings (the app is ad-hoc signed), Flatpak file portals, Windows portable DLLs and per-user save directories.
+- [ ] Confirm no fast-forward/rewind actions or CP93 dashboard have returned.
+- [ ] Verify performance on actual machines; do not infer universal 59.73 FPS from compilation tests.
 
-- [ ] Run the distributed application on a clean machine without a build toolchain; verify application icon and About branding.
-- [ ] Verify the CP93-style Library / Settings / System / TAS / Cheats / Info menus, two-column no-ROM dashboard, clickable Open ROM/BIOS/Input buttons, and no full-screen logo replacement.
-- [ ] Verify the ten standard GBA keyboard/gamepad input mappings; save, restart, and confirm persistence. Confirm returning without saving restores the prior configuration.
-- [ ] Verify cheat management; close and reopen the screen without losing emulator state.
-- [ ] Confirm that fullscreen hides desktop chrome and that moving the pointer to the top reveals the menu.
-- [ ] Load a legally obtained `.gba` and a supported `.zip`, with both HLE and (if available) original BIOS.
-- [ ] Play long enough to check video scaling, audio stability, controller connection/reconnection and mapping persistence.
-- [ ] Toggle fullscreen/windowed, pause/mute and the supported slower playback speed settings; check keyboard and native file dialogs.
-- [ ] Verify SRAM/Flash/EEPROM saves, save/load states, screenshots, cheats, TAS and AVI capture where exposed.
-- [ ] Verify the SDL2 data importer is non-destructive with a backup test folder.
-- [ ] On Flatpak, access game files through desktop file portals and verify sandboxed data after restart.
-- [ ] On macOS, record Gatekeeper behavior and acknowledge that the app is not notarized.
-- [ ] Compare performance on representative hardware against the 59.73 FPS target; retain measurements rather than asserting universal full speed.
-- [ ] Run a full independently sourced GBA suite in both firmware modes and investigate any deviation from [the accuracy record](ACCURACY.md).
-
-CI artifacts and completed manual results should be identified by commit SHA before publication. Unchecked items above are **limitations**, not completed passes.
+CI is not a substitute for checked real-device results. The historical 6,998-case suite baseline is not retested by these frontend checks. Record the tested release commit SHA alongside any manual results.

@@ -1,24 +1,27 @@
-# Platforms, CP93 interface, and frontend differences
+# CipherGBA v0.3 desktop platforms and original UI parity
 
-CipherGBA maintains two desktop frontend implementations over its current C++17 emulation core, with the CP93 navigation/dashboard design being restored for the planned v0.2 release. No CP93 core sources replace the current core.
+The same current `CipherGBA_Core` implementation powers two desktop renderers. The **Linux X11 frontend from v0.1.0** is the sole UI layout reference for v0.3; the CP93 dashboard design is **not** used.
 
-| Target | Frontend | Build/package | Remaining validation |
+| Target | Renderer | Distributed as | Validation still required |
 | --- | --- | --- | --- |
-| Linux X11 / XWayland x86_64 | Native X11 | CMake, executable + shared core | Desktop game/audio and host performance across configurations |
-| Linux portable x86_64 | SDL2 | AppImage | Clean Linux distribution and audio/controller compatibility |
-| Linux Flatpak x86_64 | SDL2 | Freedesktop 25.08 runtime | File chooser portals, save persistence on various desktop environments |
-| Windows x64 | SDL2 | ZIP containing EXE and required DLLs | Real-machine UI, gamepad, audio and runtime dependency verification |
-| macOS arm64 | SDL2 | `.app` bundle in ZIP | Real-machine UI/audio/controller; notarization not provided |
-| macOS x86_64 | SDL2 | `.app` bundle in ZIP | Real-machine UI/audio/controller; notarization not provided |
+| Ubuntu Linux X11/XWayland x86_64 | Original Xlib layout | Native executable + shared core | Full game/audio/controller desktop sessions |
+| Linux x86_64 portable | Matched SDL2 layout | AppImage | Host desktop and file chooser compatibility |
+| Linux x86_64 Flatpak | Matched SDL2 layout | Flatpak | Sandboxed file portals and persistent data |
+| Windows x64 | Matched SDL2 layout | ZIP with DLL dependencies | Windows keyboard/gamepad/audio and DPI behavior |
+| macOS Apple Silicon | Matched SDL2 layout | Ad-hoc-signed app in ZIP | Real macOS behavior and Gatekeeper |
+| macOS Intel x86_64 | Matched SDL2 layout | Ad-hoc-signed app in ZIP | Real macOS behavior and Gatekeeper |
 
-The X11 and SDL2 frontends now expose the CP93 six-tab navigation: **Library, Settings, System, TAS, Cheats, Info**. Each opens a real clickable menu. At startup, a two-column library dashboard offers Open ROM, Import BIOS, and Configure Input; the screen is not covered by an application logo. Native X11 uses Xlib for rendering, while Windows/macOS/portable Linux use an SDL2 implementation with platform file dialogs. Both expose in-window input and cheat management, although some editing workflows and advanced controls differ. SDL2's F1 shortcut opens the visible Library dropdown. Fullscreen gameplay hides the desktop chrome until the pointer reaches the top, and artwork appears only in icons and About views. Linux X11 links the shared core; SDL2 links the static core built from the same current sources. See [the restoration notes](FRONTEND_CP93.md) and [cross-platform CI](../.github/workflows/portability.yml).
+## Original interface common to all
 
-## Data and migration
+- Default 1050×720 window; menu bar 38 pixels tall and status strip 30 pixels tall, scaled for high-DPI displays.
+- **File | Input | Configure | System | TAS | Cheats | Help**, in that exact order. Hover/open dropdown and nested selections.
+- No-ROM state is a dark/empty viewport with the status bar; no launcher, dashboard, or logo replacing the viewport.
+- Controller mapping (ten GBA buttons), cheat management and About displayed within the primary window.
+- Fullscreen hides the top menu until the pointer returns to it. Stretched fullscreen remains an explicit selection.
+- Original audio/ROM/state/cheat/TAS/recording actions exposed via the corresponding menus. No fast-forward or rewind controls.
 
-The Linux native frontend stores data under its application `CipherGBA_Data` directory; the SDL2 frontend uses platform-specific per-user locations. The SDL2 `--import-data DIR` option copies supported existing data **without overwriting** destination saves. Files in the supplied source directory are unchanged. Do not import platform-specific keyboard mappings. Make backups before transferring states, and note that binary save-states may not transfer between host ABIs.
+**Renderer differences:** X11 uses native desktop Xlib font rendering and Linux joystick axes; SDL2 uses embedded mixed-case bitmap glyphs, SDL gamepad buttons and portable input binding files. These are implementation differences, not intentional changes to the original screen layout. Native ROM and BIOS file pickers are host-specific. SDL2 also provides an in-window directory-path editor for changing AVI output location because directory selection APIs are not universal across all targets.
 
-## Distribution and security
+Native Linux X11 stores its original `CipherGBA_Data` files. SDL2 uses host-specific per-user application-data directories. The optional `--import-data DIR` is non-destructive; it does not import incompatible X11 keyboard mapping files.
 
-The Windows ZIP must include its DLL dependencies; macOS apps are ad-hoc signed but not notarized. The Linux AppImage is a self-contained distributable for supported x86_64 systems, not a guarantee of operation on all distributions. Flatpak depends on compatible runtimes and desktop portals. No Nintendo BIOS or game files are packaged. Check package file hashes against `SHA256SUMS.txt` when downloading from the release.
-
-See [platform acceptance](PLATFORM_ACCEPTANCE.md) for a repeatable device-test procedure.
+The [full interface specification](FRONTEND_CLASSIC_V01.md), [acceptance checklist](PLATFORM_ACCEPTANCE.md), and [build workflow](../.github/workflows/portability.yml) distinguish source-level UI parity from device-specific interaction tests.

@@ -22,31 +22,37 @@ def main():
     readme=(ROOT/'README.md').read_text(encoding='utf-8')
     check('assets/branding/ciphergba_icon.png' in readme,'README does not use canonical artwork')
     sdl=(ROOT/'CipherGBA_Frontend/src/AppSDL2.cpp').read_text(encoding='utf-8')
-    check('void uiDrawChrome(int w,int h)' in sdl,'Portable frontend menu bar is absent')
-    check('uiDrawNoRom(w,top,bottom);' in sdl,'No-ROM frontend screen is absent')
-    check('if(chrome)uiDrawChrome(w,h);' in sdl,'Frontend menu bar is not rendered')
-    render=sdl.split('    void render(){',1)[1].split('    int loop(',1)[0]
-    check('kAboutArtwork' not in render,'About artwork must never replace the main UI')
+    check('#include "ClassicSDL2Ui.inc"' in sdl,'Portable v0.1 UI not installed')
+    check('uiDrawNoRom(w,top,bottom);' in sdl,'No-ROM renderer missing')
+    check('uiDrawChrome(w,h);' in sdl,'Menu/status chrome not drawn')
     check('app.mainMenu();' not in sdl.split('int main(int argc,char** argv){',1)[1],
-          'Main window startup must not hide behind a modal popup')
+          'Startup must not hide behind a modal popup')
     x11=(ROOT/'CipherGBA_Frontend/src/AppX11.cpp').read_text(encoding='utf-8')
-    for section in ('LIBRARY','SETTINGS','SYSTEM','TAS','CHEATS','INFO'):
-        check(section in sdl, 'Missing CP93 SDL2 section: '+section)
-    for section in ('"Library"','"Settings"','"System"','"TAS"','"Cheats"','"Info"'):
-        check(section in x11, 'Missing CP93 X11 section: '+section)
-    for name in ('uiDrawInput','uiDrawCheats','uiPanelClick','uiDrawNoRom'):
-        check(name in sdl,'Missing portable full frontend component: '+name)
-    check('void drawNoRomDashboard()' in x11,'Native frontend lacks CP93 no-ROM dashboard')
-    for frontend in (sdl,x11):
+    classic=(ROOT/'CipherGBA_Frontend/src/ClassicSDL2Ui.inc').read_text(encoding='utf-8')
+    for section in ('File','Input','Configure','System','TAS','Cheats','Help'):
+        check('{"'+section+'"' in x11, 'Original X11 menu missing: '+section)
+        check('{"'+section+'"' in classic, 'Portable original menu missing: '+section)
+    for item in ('GBA Controller','Emulator Speed','Save State Slot',
+                 'Controller Input','Record AVI','Configure GBA Cheat Codes'):
+        check(item in x11 and item in classic,'Required v0.1 menu action missing: '+item)
+    check('constexpr int Bar=38' in x11,'Native menubar must match v0.1')
+    check('int uiBarHeight()const{return 38*uiScale();}' in classic,'Portable bar height wrong')
+    check('int uiStatusHeight()const{return 30*uiScale();}' in classic,'Portable status bar height wrong')
+    check('void uiDrawNoRom(int,int,int){}' in classic,'Main window must be blank without a ROM')
+    check('drawNoRomDashboard' not in x11 and 'drawNoRomDashboard' not in classic,
+          'Incorrect CP93 dashboard still present')
+    for frontend in (sdl,x11,classic):
         check('fastForward_' not in frontend and 'fastKey_' not in frontend,
-              'Accelerated playback input unexpectedly returned')
-        check('200% DOUBLE SPEED' not in frontend,
-              'Unsupported accelerated playback menu returned')
-    check('CipherGBA v0.2.0' in sdl and 'CipherGBA v0.2.0' in x11,
-          'Version metadata missing in frontend')
-
+              'Fast-forward control must remain absent')
+        check('200% DOUBLE SPEED' not in frontend,'Accelerated-playback action returned')
+    check('CipherGBA v0.3.0' in sdl and 'CipherGBA v0.3.0' in x11,
+          'Version 0.3 missing from frontends')
     check('SDL_SetWindowIcon(window,icon)' in sdl,'Application window icon missing')
-    check('void about()' in sdl and 'kAboutArtwork' in sdl,'Logo absent from About')
+    check('uiAboutArtwork(' in classic and 'kAboutArtwork' in classic,
+          'About panel missing branding')
+    render=sdl.split('    void render(){',1)[1].split('    int loop(',1)[0]
+    check('kAboutArtwork' not in render,
+          'Main viewport must never be replaced by the About art')
     for old in ('ciphergba_logo.png','ciphergba_readme_banner.png'):
         check(not (ROOT/'assets/branding'/old).exists(),'Old branding asset retained: '+old)
         check(old not in readme,'README references retired branding: '+old)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assemble verified CipherGBA v0.2 release assets from one CI run.
+"""Assemble verified CipherGBA v0.3 release assets from one CI run.
 
 Requires only Python standard library. No ROMs, BIOS images or user saves.
 The macOS .app bundles are retained INSIDE their original Apple ditto ZIPs
@@ -14,12 +14,12 @@ import zipfile
 from pathlib import Path
 
 ARTIFACTS={
-    "windows":"CipherGBA-v0.2-Windows-x64-CI",
-    "x11":"CipherGBA-v0.2-Linux-X11-x86_64-CI",
-    "appimage":"CipherGBA-v0.2-AppImage-x86_64-CI",
-    "flatpak":"CipherGBA-v0.2-Flatpak-CI",
-    "mac_arm":"CipherGBA-v0.2-macOS-arm64-CI",
-    "mac_intel":"CipherGBA-v0.2-macOS-x86_64-CI"
+    "windows":"CipherGBA-v0.3-Windows-x64-CI",
+    "x11":"CipherGBA-v0.3-Linux-X11-x86_64-CI",
+    "appimage":"CipherGBA-v0.3-AppImage-x86_64-CI",
+    "flatpak":"CipherGBA-v0.3-Flatpak-CI",
+    "mac_arm":"CipherGBA-v0.3-macOS-arm64-CI",
+    "mac_intel":"CipherGBA-v0.3-macOS-x86_64-CI"
 }
 def require(condition,message):
     if not condition:
@@ -80,24 +80,24 @@ def main():
         path=out/name
         assets.append(path)
         return path
-    zip_folder(folders["windows"],add("CipherGBA-v0.2-Windows-x64.zip"),
-               "CipherGBA-v0.2-Windows-x64")
-    zip_folder(folders["x11"],add("CipherGBA-v0.2-Linux-X11-x86_64.zip"),
-               "CipherGBA-v0.2-Linux-X11-x86_64")
-    app=add("CipherGBA-v0.2-Linux-x86_64.AppImage")
+    zip_folder(folders["windows"],add("CipherGBA-v0.3-Windows-x64.zip"),
+               "CipherGBA-v0.3-Windows-x64")
+    zip_folder(folders["x11"],add("CipherGBA-v0.3-Linux-X11-x86_64.zip"),
+               "CipherGBA-v0.3-Linux-X11-x86_64")
+    app=add("CipherGBA-v0.3-Linux-x86_64.AppImage")
     copy_single(folders["appimage"],"*.AppImage",app)
     require(app.open("rb").read(4)==b"\x7fELF","Invalid Linux AppImage")
-    flat=add("CipherGBA-v0.2-Linux-x86_64.flatpak")
+    flat=add("CipherGBA-v0.3-Linux-x86_64.flatpak")
     copy_single(folders["flatpak"],"*.flatpak",flat)
     for key,arch in (("mac_arm","arm64"),("mac_intel","x86_64")):
-        target=add("CipherGBA-v0.2-macOS-"+arch+".zip")
+        target=add("CipherGBA-v0.3-macOS-"+arch+".zip")
         copy_single(folders[key],"*.zip",target)
         names=zip_valid(target)
         require(any(x.endswith("CipherGBA.app/Contents/MacOS/CipherGBA")
                     for x in names),"Mac .app executable missing in "+arch)
         require(any("CipherGBA.app/Contents/Frameworks/" in x for x in names),
                 "Bundled macOS frameworks absent for "+arch)
-    source=add("CipherGBA-v0.2-Source.zip")
+    source=add("CipherGBA-v0.3-Source.zip")
     shutil.copyfile(args.source,source)
     names=zip_valid(source)
     for expected in ("README.md","RELEASE_NOTES.md","THIRD_PARTY_NOTICES.md"):
@@ -108,28 +108,28 @@ def main():
         require(not path.suffix.lower() in forbid,
                 "Compiled or private ROM/BIOS/save file in source archive: "+name)
     readme=(
-        "CipherGBA v0.2 | HodgkinsStudios\n"
+        "CipherGBA v0.3 | HodgkinsStudios\n"
         "Commit: "+args.commit+"\n\n"
-        "Windows x64: extract CipherGBA-v0.2-Windows-x64.zip and run CipherGBA.exe.\n"
+        "Windows x64: extract CipherGBA-v0.3-Windows-x64.zip and run CipherGBA.exe.\n"
         "macOS arm64/Intel: extract the appropriate macOS ZIP; open CipherGBA.app.\n"
         "  Apps are ad-hoc signed, not notarized. Review macOS Gatekeeper notices.\n"
-        "Linux AppImage: chmod +x *.AppImage && ./CipherGBA-v0.2-Linux-x86_64.AppImage\n"
-        "Linux Flatpak: flatpak install --user ./CipherGBA-v0.2-Linux-x86_64.flatpak\n"
+        "Linux AppImage: chmod +x *.AppImage && ./CipherGBA-v0.3-Linux-x86_64.AppImage\n"
+        "Linux Flatpak: flatpak install --user ./CipherGBA-v0.3-Linux-x86_64.flatpak\n"
         "  Requires the Freedesktop 25.08 runtime.\n"
         "Linux X11: extract the X11 ZIP and run ./CipherGBA (system libX11/zlib required).\n"
-        "Source: CipherGBA-v0.2-Source.zip (C++17 / CMake; no game or firmware files).\n\n"
+        "Source: CipherGBA-v0.3-Source.zip (C++17 / CMake; no game or firmware files).\n\n"
         "Accuracy: 6994/6998 in both BIOS modes; 4 disputed HBlank suite tests.\n"
         "GUI/audio/controller workflows on clean Windows/Mac systems remain unverified.\n"
         "No Nintendo ROMs or BIOS are included. No project-wide reuse license is granted.\n"
         "See RELEASE_NOTES.md inside the source archive for full details.\n"
     )
     first_manifest="".join(hash_file(x)+"  "+x.name+"\n" for x in assets)
-    combined=out/"CipherGBA-v0.2-ALL-PLATFORMS.zip"
+    combined=out/"CipherGBA-v0.3-ALL-PLATFORMS.zip"
     with zipfile.ZipFile(combined,"w",compression=zipfile.ZIP_STORED,allowZip64=True) as z:
-        z.writestr("CipherGBA-v0.2/README_FIRST.txt",readme)
-        z.writestr("CipherGBA-v0.2/SHA256SUMS.txt",first_manifest)
+        z.writestr("CipherGBA-v0.3/README_FIRST.txt",readme)
+        z.writestr("CipherGBA-v0.3/SHA256SUMS.txt",first_manifest)
         for item in assets:
-            z.write(item,"CipherGBA-v0.2/"+item.name)
+            z.write(item,"CipherGBA-v0.3/"+item.name)
     zip_valid(combined)
     assets.append(combined)
     manifest=out/"SHA256SUMS.txt"
