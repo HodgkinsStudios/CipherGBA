@@ -12,7 +12,7 @@ const std::array<const char*, KeyCount>& keyNames() {
 Bindings Bindings::defaults() {
     Bindings b;
     // X11 KeySym values: Return, BackSpace, arrow keys, and lowercase ASCII.
-    b.keyboard = {'z', 'x', 0xff08, 0xff0d, 0xff53, 0xff51, 0xff52, 0xff54, 's', 'a'}; // F9 hold fast-forward, F10 hold rewind
+    b.keyboard = {'z', 'x', 0xff08, 0xff0d, 0xff53, 0xff51, 0xff52, 0xff54, 's', 'a'}; // Only the ten GBA hardware buttons are configurable.
     // Linux /dev/input/js0 button and axis indices (common Xbox layout).
     // Buttons: 0=A, 1=B, 4=LB, 5=RB, 6=Back, 7=Start.
     // D-pad is commonly axes 6/7. Remap if your controller differs.
