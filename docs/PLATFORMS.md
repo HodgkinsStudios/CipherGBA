@@ -20,7 +20,7 @@ The same current `CipherGBA_Core` implementation powers two desktop renderers. T
 - Fullscreen hides the top menu until the pointer returns to it. Stretched fullscreen remains an explicit selection.
 - Original audio/ROM/state/cheat/TAS/recording actions exposed via the corresponding menus. No fast-forward or rewind controls.
 
-**Renderer differences:** X11 uses native desktop Xlib font rendering and Linux joystick axes; SDL2 uses embedded mixed-case bitmap glyphs, SDL gamepad buttons and portable input binding files. These are implementation differences, not intentional changes to the original screen layout. Native ROM and BIOS file pickers are host-specific. SDL2 also provides an in-window directory-path editor for changing AVI output location because directory selection APIs are not universal across all targets.
+**Renderer differences:** X11 uses native desktop Xlib font rendering and Linux joystick axes; SDL2 uses embedded mixed-case bitmap glyphs, SDL gamepad buttons/axes and portable input binding files. These are implementation differences, not intentional changes to the original screen layout. Native ROM and BIOS file pickers are host-specific. SDL2 also provides an in-window directory-path editor for changing AVI output location because directory selection APIs are not universal across all targets.
 
 Native Linux X11 stores its original `CipherGBA_Data` files. SDL2 uses host-specific per-user application-data directories. The optional `--import-data DIR` is non-destructive; it does not import incompatible X11 keyboard mapping files.
 
