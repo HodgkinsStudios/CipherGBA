@@ -1051,7 +1051,7 @@ struct Application {
             while(SDL_PollEvent(&e))handleEvent(e);
             if(!running)break;
             const auto now=Clock::now();
-            if(!paused && core.cartridge().loaded() && now>=next){
+            if(!paused && uiPanel_==UiPanel::Game && core.cartridge().loaded() && now>=next){
                 runFrame();
                 ++totalFrames;
                 if(smokeFrameLimit && totalFrames>=smokeFrameLimit)return 0;
@@ -1087,7 +1087,7 @@ struct Application {
                 const auto left=std::chrono::duration_cast<std::chrono::milliseconds>(next-update);
                 if(left.count()>1)SDL_Delay(static_cast<Uint32>(std::min<long long>(left.count()-1,4)));
                 else SDL_Delay(1);
-            }else if(paused || !core.cartridge().loaded())SDL_Delay(12);
+            }else if(paused || uiPanel_!=UiPanel::Game || !core.cartridge().loaded())SDL_Delay(12);
         }
         return 0;
     }
