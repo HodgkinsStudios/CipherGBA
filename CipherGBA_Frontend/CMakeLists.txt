@@ -1,6 +1,6 @@
 # CipherGBA v0.1 -- preserve the original Linux X11 frontend and add SDL2.
-# Generate one embedded icon source for the Linux WM icon, SDL2 window icon,
-# no-ROM welcome screen and every platform's About view.
+# Generate one embedded icon source for the Linux WM icon, SDL2 window icon
+# and every platform's About view. Never use artwork as a startup splash.
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
 set(CIPHERGBA_GENERATED_ARTWORK "${CMAKE_CURRENT_BINARY_DIR}/BrandArtwork.hpp")
 execute_process(

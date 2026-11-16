@@ -7,8 +7,9 @@ The portable and native frontends use it consistently:
 
 - Linux X11/About: compressed pixels generated at CMake configuration with
   `packaging/branding/generate_embedded_artwork.py` (384px About, 64px/32px WM icons).
-- SDL2 Linux/Windows/macOS: same embedded pixels for the splash, separate
-  About window and SDL application window icon.
+- SDL2 Linux/Windows/macOS: embedded pixels for the dedicated About window
+  and the SDL application window icon. The no-ROM main window has text and
+  usable menus, never a logo splash.
 - Windows EXE resource: 256px native ICO generated from the same source PNG.
 - macOS app bundle: 256px native ICNS generated from the same source PNG.
 - Linux desktop/Flatpak/AppImage: installed PNG from the same source; Flatpak

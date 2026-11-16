@@ -1,13 +1,10 @@
 name: Publish CipherGBA v0.1
 
-# Publish from a fully successful, main-branch full-platform CI run.
-# workflow_dispatch stays available for manual retries.
+# v0.1.0 has already been published. Do not automatically republish from CI.
+# The next planned release is v0.2; its release workflow and assets must be
+# explicitly prepared and dispatched only after further platform acceptance.
 on:
   workflow_dispatch:
-  workflow_run:
-    workflows: ["v0.1 portability builds"]
-    types: [completed]
-    branches: [main]
 
 concurrency:
   group: ciphergba-release-v0.1.0
