@@ -167,7 +167,7 @@ private:
 // All optional features below are host-side unless explicitly marked hardware-facing.
 class App {
     enum Cmd {
-        LoadRom=1,LoadBios,ResetRom,Quit,FullScreen,Windowed,InputConfig,
+        LoadRom=1,LoadBios,ResetRom,SaveCartridge,Quit,FullScreen,Windowed,InputConfig,
         FullScreenStretch,Mute,Speed100,Speed50,Speed25,Screenshot,
         SaveState,LoadState,Slot1,Slot2,Slot3,Slot4,RecordVideo,StopVideo,Pause,
         TasRecord,TasStop,TasPlayback,TasPlaybackStop,TasReset,
@@ -251,7 +251,7 @@ class App {
         menus_={
             {"Library",{action("Open GBA ROM / ZIP...",LoadRom),
                 action("Import GBA BIOS...",LoadBios),action("Reset current game",ResetRom),
-                separator(),action("Quit CipherGBA",Quit)}},
+                action("Save cartridge data",SaveCartridge),separator(),action("Quit CipherGBA",Quit)}},
             {"Settings",{action("Input settings...",InputConfig),
                 branch("Emulator speed",4),separator(),
                 action("Record With Toast",RecordToast),
@@ -1038,6 +1038,8 @@ private:
             case LoadRom:{const auto file=selectFile(0,fs::current_path());if(!file.empty())loadRom(file);break;}
             case LoadBios:{const auto file=selectFile(1,fs::current_path());if(!file.empty())loadBios(file);break;}
             case ResetRom:resetRom();break;
+            case SaveCartridge:{std::string error;if(core_.flushSave(error))notice("CARTRIDGE SAVED");
+                else notice("SAVE FAILED: "+error);break;}
             case Quit:running_=false;break;
             case FullScreen:fullscreen(true,false);break;
             case FullScreenStretch:fullscreen(true,true);break;
