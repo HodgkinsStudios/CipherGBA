@@ -225,7 +225,7 @@
     void uiOpenInput(){
         uiBeforePanelPaused_=paused;
         paused=true;pausedBeforeInput_=uiBeforePanelPaused_;
-        oldKeyMap_=keyMap_;oldPadMap_=padMap_;
+        oldKeyMap_=keyMap_;oldPadMap_=padMap_;oldAxisMap_=axisMap_;
         remap_=RemapMode::None;uiCaptureSingle_=false;
         uiPanel_=UiPanel::Controller;
         uiNotice("CONTROLLER INPUT");
@@ -235,7 +235,7 @@
             if(!saveBindings())return;
             uiNotice("CONTROLLER INPUT SAVED");
         }else{
-            keyMap_=oldKeyMap_;padMap_=oldPadMap_;
+            keyMap_=oldKeyMap_;padMap_=oldPadMap_;axisMap_=oldAxisMap_;
         }
         uiPanel_=UiPanel::Game;
         remap_=RemapMode::None;uiCaptureSingle_=false;
@@ -471,7 +471,7 @@
             if(y>=h-30-72&&y<h-30-31){
                 if(x>=24&&x<168)uiCloseInput(true);
                 else if(x>=179&&x<339){
-                    keyMap_=defaultKeys_;padMap_=defaultPad_;
+                    keyMap_=defaultKeys_;padMap_=defaultPad_;axisMap_={};
                     remap_=RemapMode::None;
                 }else if(x>=350&&x<504)uiCloseInput(false);
             }
@@ -663,10 +663,21 @@
                 const int y=159+i*39;
                 uiLabel(25,y+23,buttonNames_[static_cast<std::size_t>(i)],0xf0f4fa);
                 const char* key=SDL_GetScancodeName(keyMap_[static_cast<std::size_t>(i)]);
-                const char* pad=SDL_GameControllerGetStringForButton(padMap_[static_cast<std::size_t>(i)]);
+                std::string padLabel;
+                if(axisMap_[static_cast<std::size_t>(i)].axis>=0){
+                    const auto mapping=axisMap_[static_cast<std::size_t>(i)];
+                    const char* axis=SDL_GameControllerGetStringForAxis(
+                        static_cast<SDL_GameControllerAxis>(mapping.axis));
+                    padLabel=std::string(axis&&*axis?axis:"AXIS")+
+                        (mapping.direction>0?" +":" -");
+                }else{
+                    const char* pad=SDL_GameControllerGetStringForButton(
+                        padMap_[static_cast<std::size_t>(i)]);
+                    padLabel=(pad&&*pad)?pad:"Unassigned";
+                }
                 uiButton(176,y,260,33,(key&&*key)?key:"Unassigned",
                     remap_==RemapMode::Keyboard&&remapIndex_==unsigned(i));
-                uiButton(460,y,285,33,(pad&&*pad)?pad:"Unassigned",
+                uiButton(460,y,285,33,padLabel,
                     remap_==RemapMode::Gamepad&&remapIndex_==unsigned(i));
             }
             if(remap_!=RemapMode::None)
