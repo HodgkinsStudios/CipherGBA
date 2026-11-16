@@ -224,7 +224,7 @@
 
     void uiOpenInput(){
         uiBeforePanelPaused_=paused;
-        paused=true;pausedBeforeInput_=uiBeforePanelPaused_;
+        pausedBeforeInput_=uiBeforePanelPaused_;// Panels halt frames without setting PAUSED
         oldKeyMap_=keyMap_;oldPadMap_=padMap_;oldAxisMap_=axisMap_;
         remap_=RemapMode::None;uiCaptureSingle_=false;
         uiPanel_=UiPanel::Controller;
@@ -243,7 +243,7 @@
     }
     void uiOpenCheats(){
         uiBeforePanelPaused_=paused;
-        paused=true;uiPanel_=UiPanel::Cheats;
+        uiPanel_=UiPanel::Cheats;
         uiSelectedCheat_=-1;uiCheatScroll_=0;uiCheatEditing_=false;
         cheats_.clear();loadCheats();
     }
@@ -273,7 +273,7 @@
     }
     void uiOpenRecordingFolder(){
         uiBeforePanelPaused_=paused;
-        paused=true;uiPanel_=UiPanel::RecordingDirectory;
+        uiPanel_=UiPanel::RecordingDirectory;
         const auto current=uiRecordingDirectory_.empty()?data/"recordings":uiRecordingDirectory_;
         uiDirectoryText_=current.u8string();
         SDL_StartTextInput();
@@ -355,7 +355,10 @@
         case USpeed50:speedPercent_=50;break;
         case USpeed25:speedPercent_=25;break;
         case UInput:uiOpenInput();break;
-        case UScreenshot:screenshot();uiNotice("SCREENSHOT SAVED");break;
+        case UScreenshot:
+            if(!core.cartridge().loaded())uiNotice("LOAD A ROM FIRST");
+            else{screenshot();uiNotice("SCREENSHOT SAVED");}
+            break;
         case USaveState:saveState();uiNotice("SAVE STATE");break;
         case ULoadState:loadState();uiNotice("LOAD STATE");break;
         case URecordAVI:
@@ -371,7 +374,7 @@
         case URecordToast:uiRecordToast_=!uiRecordToast_;break;
         case URecordTimer:uiRecordTimer_=!uiRecordTimer_;break;
         case URecordingFolder:uiOpenRecordingFolder();break;
-        case UAbout:uiBeforePanelPaused_=paused;paused=true;
+        case UAbout:uiBeforePanelPaused_=paused;
             uiPanel_=UiPanel::About;break;
         default:break;
         }
