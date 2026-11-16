@@ -808,6 +808,8 @@ struct Application {
     std::string uiToastMessage_;
     std::chrono::steady_clock::time_point uiToastUntil_{};
     int uiCheatScroll_=0;
+    int uiSubmenu_=0; // 1: speed, 2: APU mixer, 3: state slot
+
     struct UiEntry {const char* label;int action;};
     std::vector<UiEntry> uiEntries(int tab) const {
         switch(tab){
@@ -867,10 +869,30 @@ struct Application {
         int w=0,h=0;SDL_GetRendererOutputSize(renderer,&w,&h);
         const int left=uiPopupX(uiMenu_,w),width=375*uiScale();
         const int top=uiBarHeight()+8*uiScale(),row=uiPopupRow();
+        if(uiSubmenu_){
+            const int subLeft=uiSubmenuX(w),subTop=uiSubmenuY();
+            const int subRow=40*uiScale(),count=uiSubmenu_==1?5:uiSubmenu_==2?6:4;
+            if(x>=subLeft&&x<subLeft+270*uiScale()&&y>=subTop&&y<subTop+count*subRow){
+                const int index=(y-subTop)/subRow;
+                return (uiSubmenu_==1?101:uiSubmenu_==2?110:120)+index;
+            }
+        }
         const auto entries=uiEntries(uiMenu_);
         if(x<left||x>=left+width||y<top||
            y>=top+static_cast<int>(entries.size())*row)return 0;
         return entries[std::size_t((y-top)/row)].action;
+    }
+    int uiSubmenuX(int w)const{
+        const int sc=uiScale();
+        const int parentRight=uiPopupX(uiMenu_,w)+375*sc;
+        return parentRight+270*sc>w ? uiPopupX(uiMenu_,w)-270*sc:parentRight;
+    }
+    int uiSubmenuY()const{
+        int index=0;
+        if(uiSubmenu_==1)index=uiMenu_==1?1:0;
+        if(uiSubmenu_==2)index=uiMenu_==2?5:4;
+        if(uiSubmenu_==3)index=8;
+        return uiBarHeight()+8*uiScale()+index*uiPopupRow();
     }
     void uiOpenInput(){
         oldKeyMap_=keyMap_;oldPadMap_=padMap_;
@@ -925,6 +947,14 @@ struct Application {
         case 24:if(!fullscreen)toggleFullscreen();stretched=true;break;
         case 25:cheatsEnabled_=!cheatsEnabled_;break;
         case 26:loadCheats();break;
+        case 101:speedPercent_=25;break;
+        case 102:speedPercent_=50;break;
+        case 103:speedPercent_=75;break;
+        case 104:speedPercent_=100;break;
+        case 105:speedPercent_=200;break;
+        case 120:case 121:case 122:case 123:stateSlot=command-119;break;
+        case 110:case 111:case 112:case 113:case 114:case 115:
+            core.setAudioChannelMask(core.audioChannelMask()^(1u<<(command-110)));break;
         default:break;
         }
     }
@@ -1014,6 +1044,32 @@ struct Application {
                 uiFill(left+7*sc,yy+1*sc,width-14*sc,row-2*sc,{39,91,130,255});
             uiFill(left+16*sc,yy+17*sc,6*sc,6*sc,{81,125,164,255});
             uiText(entries[i].label,left+width/2,yy+14*sc,1);
+            if(entries[i].action==6||entries[i].action==14||entries[i].action==15)
+                uiText(">",left+width-24*sc,yy+14*sc,1,{102,196,255,255});
+        }
+        if(uiSubmenu_){
+            const int subX=uiSubmenuX(w),subY=uiSubmenuY(),subRow=40*sc;
+            const int count=uiSubmenu_==1?5:uiSubmenu_==2?6:4;
+            uiFill(subX,subY,270*sc,count*subRow+8*sc,{31,55,76,255});
+            uiOutline(subX,subY,270*sc,count*subRow+8*sc,{113,162,200,255});
+            const char* speeds[]={"25% QUARTER SPEED","50% HALF SPEED","75% REDUCED SPEED",
+                                 "100% NORMAL SPEED","200% DOUBLE SPEED"};
+            const char* channels[]={"SQUARE 1","SQUARE 2","WAVE","NOISE",
+                                    "DIRECT SOUND A","DIRECT SOUND B"};
+            for(int i=0;i<count;++i){
+                const int yy=subY+i*subRow;
+                bool checked=uiSubmenu_==1?speedPercent_==(i==0?25:i==1?50:i==2?75:i==3?100:200):
+                             uiSubmenu_==2?(core.audioChannelMask()&(1u<<i))!=0:
+                             stateSlot==i+1;
+                if(uiMouseX_>=subX&&uiMouseX_<subX+270*sc&&
+                   uiMouseY_>=yy&&uiMouseY_<yy+subRow)
+                    uiFill(subX+4*sc,yy+1*sc,262*sc,subRow-2*sc,{46,92,127,255});
+                uiFill(subX+15*sc,yy+14*sc,14*sc,14*sc,
+                       checked?SDL_Color{49,142,107,255}:SDL_Color{64,84,109,255});
+                const std::string label=uiSubmenu_==1?speeds[i]:
+                    uiSubmenu_==2?channels[i]:"SLOT "+std::to_string(i+1);
+                uiText(label,subX+146*sc,yy+13*sc,1);
+            }
         }
     }
     void uiDrawNoRom(int w,int top,int bottom){
@@ -1203,7 +1259,7 @@ struct Application {
             uiMouseX_=x;uiMouseY_=y;
             if(uiMenu_>=0){
                 const int tab=uiTabAt(x,y);
-                if(tab>=0)uiMenu_=tab;
+                if(tab>=0&&uiMenu_!=tab){uiMenu_=tab;uiSubmenu_=0;}
             }
             return;
         }
@@ -1212,11 +1268,16 @@ struct Application {
             uiMouseX_=x;uiMouseY_=y;
             if(uiChromeVisible()){
                 const int tab=uiTabAt(x,y);
-                if(tab>=0){uiMenu_=uiMenu_==tab?-1:tab;return;}
+                if(tab>=0){uiMenu_=uiMenu_==tab?-1:tab;uiSubmenu_=0;return;}
             }
             if(uiMenu_>=0){
                 const int command=uiActionAt(x,y);
-                uiMenu_=-1;
+                if(command==14||command==15||command==6){
+                    const int submenu=command==14?1:command==15?2:3;
+                    uiSubmenu_=uiSubmenu_==submenu?0:submenu;
+                    return;
+                }
+                uiMenu_=-1;uiSubmenu_=0;
                 if(command)uiAction(command);
                 return;
             }
@@ -1281,7 +1342,7 @@ struct Application {
         }
         if(event.type!=SDL_KEYDOWN||event.key.repeat)return;
         const auto key=event.key.keysym.sym;
-        if(uiMenu_>=0 && key==SDLK_ESCAPE){uiMenu_=-1;return;}
+        if(uiMenu_>=0 && key==SDLK_ESCAPE){uiMenu_=-1;uiSubmenu_=0;return;}
         if(uiPanel_==UiPanel::Input && remap_==RemapMode::None &&
            key==SDLK_ESCAPE){uiCloseInput(false);return;}
         if(uiPanel_==UiPanel::Cheats && key==SDLK_ESCAPE){
@@ -1304,7 +1365,7 @@ struct Application {
         if((event.key.keysym.mod & KMOD_CTRL) && key==SDLK_o)chooseFile(false);
         else if((event.key.keysym.mod & KMOD_CTRL) && key==SDLK_b)chooseFile(true);
         else if((event.key.keysym.mod & KMOD_CTRL) && key==SDLK_i)uiOpenInput();
-        else if(key==SDLK_F1)mainMenu();
+        else if(key==SDLK_F1){uiMenu_=uiMenu_>=0?-1:0;uiSubmenu_=0;}
         else if(key==SDLK_F3)tasMenu();
         else if(key==SDLK_F12)uiAction(21);
         else if(key==SDLK_ESCAPE||key==SDLK_F11)toggleFullscreen();
