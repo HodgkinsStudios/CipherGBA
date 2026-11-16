@@ -4,7 +4,7 @@
 
 Restore the desktop interface from the provided `CipherGBA_CP93_2026-11-01_HLE_WAIT_PIPELINE_6993_FULL_SOURCE.zip` as the **visual and navigational reference** for the upcoming v0.2 release.
 
-The emulation core on GitHub `main` is authoritative. The older archive is **not** a source of core patches or BIOS changes. This pass changes desktop frontend code, desktop branding/font support, checks, and documentation only.
+The emulation core on GitHub `main` is authoritative. The older archive is **not** a source of core patches or BIOS changes. This pass changes desktop frontend code, desktop branding/font support, checks, and documentation only. Per the release scope, the historical transport-speed and rewind controls are intentionally not carried into this UI.
 
 ## Baseline comparison
 
@@ -13,7 +13,7 @@ The emulation core on GitHub `main` is authoritative. The older archive is **not
 | Navigation | Library / Settings / System / TAS / Cheats / Info | Six sections on X11 and SDL2 |
 | Startup | Two-column library dashboard | Two-column dashboard with functioning Open ROM, Import BIOS, and Input buttons |
 | Application artwork | Studio identity, not a full-screen logo placeholder | Program icon, README header, and About; never replaces main display |
-| Input remapping | Dedicated keyboard/gamepad page, including Fast Forward, Save, Reset Defaults, Return | Embedded eleven-action remapping page in SDL2 and X11; keyboard and gamepad Fast Forward are persisted as frontend settings |
+| Input remapping | Dedicated keyboard/gamepad page, Save, Reset Defaults, Return | In-window ten-button GBA keyboard/gamepad mapping on SDL2 and X11; no accelerated-play or rewind controls are exposed |
 | Cheats | Dedicated cheat lab | Dedicated management page; platform-specific code entry workflows remain different |
 | Playback | Fullscreen modes, audio, states, capture, TAS | Available through corresponding live menus and backend actions |
 | Existing GBA hardware | Historical CP93 implementation | **Unchanged** GitHub core |
