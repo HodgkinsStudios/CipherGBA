@@ -167,6 +167,7 @@
         SDL_SetRenderDrawColor(renderer,c.r,c.g,c.b,c.a);
         int column=0;
         for(unsigned char ch:text){
+            if(ch==' '){++column;continue;}
             const ciphergba_about::Glyph* glyph=nullptr;
             for(const auto& g:ciphergba_about::kGlyphs)
                 if(static_cast<unsigned char>(g.ch)==ch){glyph=&g;break;}
