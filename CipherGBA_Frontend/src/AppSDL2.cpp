@@ -115,7 +115,7 @@ struct Application {
     PadMap padMap_=defaultPad_,oldPadMap_=defaultPad_;
 
     int stateSlot=1;
-    int uiMenu_=-1, uiMouseX_=-1, uiMouseY_=-1;
+    int uiMenu_=-1, uiMouseX_=0, uiMouseY_=0;
     std::string romName;
     std::chrono::steady_clock::time_point frameDeadline{};
     ~Application() {
@@ -139,7 +139,7 @@ struct Application {
             errorMessage(nullptr,SDL_GetError());return false;
         }
         window=SDL_CreateWindow("CipherGBA v0.3 - F1 Menu | Ctrl+O Open ROM",
-            SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,1050,720,
+            55,45,1050,720,
             SDL_WINDOW_RESIZABLE|SDL_WINDOW_ALLOW_HIGHDPI);
         if(!window){errorMessage(nullptr,SDL_GetError());return false;}
         SDL_SetWindowMinimumSize(window,730,540);
