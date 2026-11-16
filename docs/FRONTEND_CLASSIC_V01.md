@@ -12,12 +12,12 @@
 | Background with no ROM | Empty deep-black/navy viewport | Same empty viewport; **no CP93 dashboard** |
 | Bottom bar | 30px dark status line, `NO ROM  SLOT 1  100%` | Same layout and state fields |
 | Menu dropdowns | 32px rows, narrow separators, hover highlights | Same row spacing, check indicators, submenus |
-| Controller mapping | Ten rows of keyboard + gamepad assignments | In-window ten-row mapping, Save/Defaults/Cancel |
+| Controller mapping | Ten rows of keyboard + gamepad assignments | In-window ten-row mapping, Save/Defaults/Cancel, with SDL gamepad buttons or axes |
 | Cheat codes | In-window list, Add/Remove/Save/Return | In-window editor; compile RAW/CB/GS/AR codes |
 | About | Embedded logo, system information, Return | In-window embedded logo, Return |
 | Gameplay | Aspect-preserving integer scaling, stretched fullscreen option | Matching scaling intent |
 
-The original X11 native font uses the desktop's Xlib fonts. The SDL2 renderer draws a compact embedded 5×7 mixed-case bitmap font to avoid external fonts and to run without SDL_ttf on Windows/macOS. The icon and About artwork use the existing canonical source and are never used as a main-window splash.
+The original X11 native font uses the desktop's Xlib fonts. The SDL2 renderer scales embedded 5×7 mixed-case bitmap glyphs to approximately 9×15 logical-pixel cells to avoid external fonts and to run without SDL_ttf on Windows/macOS. The icon and About artwork use the existing canonical source and are never used as a main-window splash.
 
 ## Menu definitions
 
