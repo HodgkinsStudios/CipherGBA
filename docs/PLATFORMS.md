@@ -11,7 +11,7 @@ CipherGBA v0.1 maintains two desktop frontends on top of the same C++17 emulatio
 | macOS arm64 | SDL2 | `.app` bundle in ZIP | Real-machine UI/audio/controller; notarization not provided |
 | macOS x86_64 | SDL2 | `.app` bundle in ZIP | Real-machine UI/audio/controller; notarization not provided |
 
-The X11 interface preserves native Linux menus and detailed controls; SDL2 offers an F1 on-screen menu and native file-picker integrations where supported. Some presentation and configuration options differ. Both use the same shared emulation source; Linux X11 links a shared core, while SDL2 links the optional core static target. Build recipes and package verification can be reviewed in [portability.yml](../.github/workflows/portability.yml).
+The X11 interface preserves native Linux menus and detailed controls. SDL2 presents a visible, clickable **File / System / Config / Help** menu bar in its main window, with native file-picker integrations where supported. The menu bar hides automatically during fullscreen gameplay unless the pointer moves to the top; F1 also opens the legacy menu dialog. With no ROM loaded, the SDL2 window shows a text-only Open ROM prompt, never a large logo image. The artwork remains in the application icon and About view. Some presentation and configuration options differ. Both use the same shared emulation source; Linux X11 links a shared core, while SDL2 links the optional core static target. Build recipes and package verification can be reviewed in [portability.yml](../.github/workflows/portability.yml).
 
 ## Data and migration
 
