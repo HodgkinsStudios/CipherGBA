@@ -16,7 +16,7 @@ CipherGBA emulates the Game Boy Advance using an independently maintained GBA co
 - A standalone C++17 core available as shared and optionally static libraries.
 - One consistent application icon throughout the README, Linux windows, Windows executable, macOS bundle and About dialogs.
 
-The Linux X11 and cross-platform SDL2 frontends use different layouts and do not provide identical options. See [platform support](docs/PLATFORMS.md).
+The Linux X11 and cross-platform SDL2 frontends use different layouts and do not provide identical options. The portable SDL2 window now displays a persistent, clickable **File / System / Config / Help** toolbar and a text-only no-ROM welcome view. The project artwork is used as the application icon, in this README, and within About—not as a replacement for the main window. F1 still opens the legacy menu dialog as an alternative to the toolbar. See [platform support](docs/PLATFORMS.md).
 
 <p align="center"><img src="docs/images/main_window.png" alt="CipherGBA Linux desktop frontend" width="680"></p>
 
