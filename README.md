@@ -18,7 +18,7 @@ CipherGBA emulates the Game Boy Advance using an independently maintained GBA co
 
 ### Desktop interface — CP93 design restored for v0.2
 
-Both frontend implementations follow the six-tab **Library / Settings / System / TAS / Cheats / Info** layout from the CP93 full source. Starting without a ROM shows the two-column library/dashboard with clickable **Open ROM**, **Import BIOS**, and **Configure Input** controls rather than displaying a giant logo. Input mapping has a dedicated in-window keyboard/gamepad table with a configurable eleventh **Fast Forward** action, and cheats have a dedicated management view. F1 opens the Library dropdown. Menu groups expose display, audio, state, capture and input-movie features.
+Both frontend implementations follow the six-tab **Library / Settings / System / TAS / Cheats / Info** layout from the CP93 full source. Starting without a ROM shows the two-column library/dashboard with clickable **Open ROM**, **Import BIOS**, and **Configure Input** controls rather than displaying a giant logo. Input mapping has a dedicated in-window keyboard/gamepad table for the ten original GBA controls, and cheats have a dedicated management view. F1 opens the Library dropdown. Menu groups expose display, audio, state, capture and input-movie features.
 
 The native Linux X11 frontend uses Xlib; Windows, macOS and portable Linux builds render the corresponding interface using SDL2. Their dialog implementations, menus and feature depth are not yet visually or functionally identical in every detail. The original CP93 C++ core is **not** included: the current GBA core remains unchanged. See [the frontend migration notes](docs/FRONTEND_CP93.md) and [platform differences](docs/PLATFORMS.md).
 
@@ -76,7 +76,7 @@ To build only the core, use `cmake -S . -B build-core -DPIXELGBA_BUILD_GUI=OFF` 
 | Save / load state | F5 / F8 |
 | Change slot / pause | F6 / F7 |
 | Screenshot / stretch | F9 / F10 |
-| Fullscreen / fast-forward | Escape or F11 / Tab |
+| Fullscreen | Escape or F11 |
 
 Default keyboard: Z=A, X=B, Backspace=Select, Return=Start, arrow keys=D-pad, A=L, S=R. The SDL2 frontend stores persistent user files in OS-specific application-data directories. To **copy** existing saves, states, BIOS, TAS and cheats from a Linux X11 `CipherGBA_Data` directory, run `CipherGBA --import-data /path/to/CipherGBA_Data`. The importer does not overwrite existing destination files; back up important saves before changing installations. X11 keyboard mapping files are not imported.
 
