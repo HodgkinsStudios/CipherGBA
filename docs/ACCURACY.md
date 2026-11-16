@@ -1,4 +1,4 @@
-# CipherGBA v0.1 — Accuracy assessment
+# Accuracy and verification
 
 CipherGBA implements both integrated BIOS HLE and original BIOS operation. The recorded full numerical suite baseline below was obtained with a privately supplied `suite.gba` and original 16 KiB BIOS; neither is included in the release. These are **observed suite scores**, not proof of universal hardware accuracy.
 

@@ -1,28 +1,25 @@
-# CipherGBA v0.3.0 — original Linux v0.1 frontend across all platforms
+# CipherGBA v0.3.0 — Release notes
 
-**HodgkinsStudios · GitHub release `v0.3.0`**
+**HodgkinsStudios · [Official release](https://github.com/HodgkinsStudios/CipherGBA/releases/tag/v0.3.0)**
 
-## Corrected frontend
+## Desktop interface
 
-The v0.3 release restores the **Linux UI from the actual CipherGBA v0.1.0 source archive**, rather than the different CP93 dashboard introduced in v0.2. The v0.1 interface is now the design reference on native Linux X11, Windows x64, macOS arm64/x86_64, and SDL2 Linux packages.
+- Consistent **File / Input / Configure / System / TAS / Cheats / Help** menus on native Linux X11 and portable SDL2 builds.
+- Dark emulator viewport, compact menu/status bars, and in-window controller configuration, cheat management, and About screen.
+- Keyboard and gamepad bindings, including SDL2 controller button/axis remapping.
+- Windowed, fullscreen, stretched display, audio controls, game saves/states, screenshots, TAS input movies, and AVI capture.
+- No fast-forward or rewind controls. Application artwork is reserved for icons, documentation, and About.
 
-- Original seven-item **File / Input / Configure / System / TAS / Cheats / Help** menubar, 38px title/menu chrome, compact 30px status strip, and blank dark viewport before loading a game.
-- Matching dropdown text, nested GBA Controller, Emulator Speed, audio APU and save-state slot menus, separators and check marks.
-- In-window controller input mapping, cheat code editing and branded About panel across X11 and SDL2.
-- Preserved windowed, fullscreen, stretched display, ROM loading, BIOS import, screenshots, saves, audio controls, TAS and AVI features.
-- Fast-forward and rewind controls are intentionally **not** exposed.
-- Application logo remains in platform icons, README and About—not in the emulator's main screen.
+## Packages and verification
 
-The newer Game Boy Advance emulator core in `CipherGBA_Core/` is **unchanged**. The old v0.1 source is used as a frontend design reference only.
+Distributions are available for **Windows x64, macOS Intel/Apple Silicon, Linux X11, Linux AppImage, and Linux Flatpak**, plus complete source and an all-platform archive. Each package has an entry in the SHA-256 manifest.
 
-## Downloads
+Automated build, packaging, and selected smoke checks passed before publication. Real-device GUI, audio, controller, and performance acceptance remain separate manual verification tasks.
 
-Windows x64, macOS Intel/Apple Silicon, Linux native X11, Linux AppImage and Flatpak, full C++17 source, combined all-platform archive and SHA-256 manifest. Every binary is built and packaged from the same validated GitHub `main` commit.
+## Emulator accuracy
 
-## Tests and known limitations
+The existing emulator core was not changed for this interface release. The previously recorded BIOS/HLE suite result remains **6,994/6,998 scored checks in each BIOS mode** with four unresolved HBlank cases. It is not a universal hardware-accuracy guarantee.
 
-Automated platform CI compiles the packages and runs headless ROM/startup, persistence, AV and other selected smoke tests. Real-device visual verification, keyboard/gamepad sessions, audio consistency and file-picker behavior across every OS still require manual acceptance.
+CipherGBA does not include Nintendo ROMs or BIOS firmware. macOS binaries are ad-hoc signed and not notarized.
 
-The historical suite accuracy baseline remains **6,994/6,998 in each BIOS mode**; four HBlank assertions are unresolved. v0.3 makes no new accuracy or full-speed claims.
-
-No Nintendo ROMs or BIOS files are shipped. macOS builds are ad-hoc signed, not notarized. See [README](README.md), [frontend reference](docs/FRONTEND_CLASSIC_V01.md) and [platform checklist](docs/PLATFORM_ACCEPTANCE.md).
+For current installation and build instructions, read the [README](README.md). For prior release changes, see [Changelog](CHANGELOG.md), [Frontend](docs/FRONTEND.md), and [Platform acceptance](docs/PLATFORM_ACCEPTANCE.md).

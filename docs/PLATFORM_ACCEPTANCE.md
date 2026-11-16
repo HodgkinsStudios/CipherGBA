@@ -1,29 +1,33 @@
-# CipherGBA v0.3 — cross-platform frontend acceptance checklist
+# Cross-platform acceptance checklist
 
-**Reference:** native Linux X11 frontend of the user-supplied `CipherGBA-0.1.0.zip`. v0.3 is a frontend/release-packaging update; hardware core source is not modified.
+This checklist separates **automated verification** from **manual desktop validation**. Mark an item complete only when there is recorded evidence for the specific binary and operating system.
 
-## Automated verification
+## Automated build and package checks
 
-- [ ] Build native Linux X11, Linux SDL2, Windows x64, macOS Intel, macOS ARM, AppImage and Flatpak from the same commit.
-- [ ] Run ROM-free SDL2 startup/render smoke test; main window opens without modal prompts or oversized branding.
-- [ ] Verify the seven-menu definitions and nested submenu labels match the original v0.1 source.
-- [ ] Run the synthetic ROM/persistence/AVI and other configured CI checks; verify release-package SHA-256 manifests.
-- [ ] Confirm the Git diff contains zero modified files under `CipherGBA_Core/`.
-- [ ] Confirm no fast-forward, rewind or CP93 dashboard UI controls remain.
+The GitHub Actions workflow at [portability.yml](../.github/workflows/portability.yml) is the authoritative record of individual build/test results.
 
-## Manual desktop acceptance on each OS
+- [ ] Native Linux X11 and Linux SDL2 compile and complete their configured tests.
+- [ ] Windows x64, macOS Intel, and macOS Apple Silicon packages compile and assemble.
+- [ ] Linux AppImage and Flatpak packages assemble successfully.
+- [ ] Headless SDL2 no-ROM window smoke tests complete.
+- [ ] Synthetic persistence, CPU/timing, and related configured CI tests complete.
+- [ ] Full release archive, individual packages, and SHA-256 manifest agree.
 
-- [ ] Launch from the final package; verify a **blank dark viewport** and compact `File / Input / Configure / System / TAS / Cheats / Help` bar, with a bottom status strip showing no ROM and the state slot.
-- [ ] Open every menu and submenu (GBA Controller; Emulator Speed; APU; Save State Slot), verify the original item order, separators, hover and checked indicators.
-- [ ] Click Input / Configure → Controller Input; remap, save, reset defaults and cancel; restart and confirm mappings persist.
-- [ ] In Cheats, add, toggle, remove and save a supported code; verify the page stays in the main window.
-- [ ] Open Help → Info; logo appears **only in About**, and Return returns to the original blank viewport or running game.
-- [ ] Load a legally obtained `.gba` and `.zip` using native file pickers; test optional original BIOS and HLE.
-- [ ] Play a game and test native aspect scaling, fullscreen, fullscreen stretched, frame pacing, audio channels, pause, mute, and restore to windowed.
-- [ ] Save and load state slots, battery saves, screenshots, TAS recording/playback and AVI output folder and capture.
-- [ ] Connect/disconnect/reconnect a keyboard and gamepad; test ten mapped buttons and OS-specific input capture.
-- [ ] Inspect macOS notarization warnings (the app is ad-hoc signed), Flatpak file portals, Windows portable DLLs and per-user save directories.
-- [ ] Confirm no fast-forward/rewind actions or CP93 dashboard have returned.
-- [ ] Verify performance on actual machines; do not infer universal 59.73 FPS from compilation tests.
+**The published v0.3.0 release passed its automated platform matrix and release assembly.** The checklist above is reusable for future exact-commit runs; do not infer that every entry has been rerun following documentation-only changes.
 
-CI is not a substitute for checked real-device results. The historical 6,998-case suite baseline is not retested by these frontend checks. Record the tested release commit SHA alongside any manual results.
+## Manual tests on each operating system
+
+- [ ] Open the installed application and verify the dark no-ROM viewport, seven-menu bar and compact status line.
+- [ ] Open all menus and submenus; verify separators, hover behavior and checked options.
+- [ ] Use controller configuration to remap a keyboard key and a gamepad button or axis, save it, restart, reset defaults, and cancel without losing the previous mapping.
+- [ ] Open Help → Info; confirm the logo appears there and the Return action restores the emulator window.
+- [ ] Load user-owned `.gba` files and supported `.zip` archives using the host file picker; repeat with optional original BIOS.
+- [ ] Play a game in windowed, fullscreen, and stretched modes; verify aspect ratio, pacing, APU channels, and sound.
+- [ ] Verify keyboard/gamepad hotplug and reconnection, all standard buttons, and saved mappings.
+- [ ] Exercise cartridge saves, save-state slots, screenshots, cheats, TAS input movies, and AVI capture.
+- [ ] Confirm user data persists in the expected application-data directory.
+- [ ] Verify Windows runtime DLL loading, macOS Gatekeeper behavior, and Flatpak file access/portals.
+- [ ] Confirm there are no fast-forward/rewind controls.
+- [ ] Measure representative real-game performance. Do not infer sustained full speed from a successful compile or startup smoke test.
+
+See [Accuracy](ACCURACY.md) for the distinct 6,998-case numerical suite. That baseline must not be represented as a new full-suite run when only frontend or documentation changes have occurred.
