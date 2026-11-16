@@ -113,6 +113,10 @@ struct Application {
         SDL_CONTROLLER_BUTTON_RIGHTSHOULDER,SDL_CONTROLLER_BUTTON_LEFTSHOULDER}};
     KeyMap keyMap_=defaultKeys_,oldKeyMap_=defaultKeys_;
     PadMap padMap_=defaultPad_,oldPadMap_=defaultPad_;
+    // Host-only SDL2 gamepad axis support, matching v0.1 Linux remapping.
+    struct PadAxisBinding {int axis=-1;int direction=0;};
+    using AxisMap=std::array<PadAxisBinding,10>;
+    AxisMap axisMap_{},oldAxisMap_{};
 
     int stateSlot=1;
     int uiMenu_=-1, uiMouseX_=0, uiMouseY_=0;
@@ -331,10 +335,12 @@ struct Application {
         if(ec){message("Cannot create input configuration directory: "+ec.message());return false;}
         std::ofstream out(bindingsFile(),std::ios::trunc);
         if(!out){message("Cannot open input configuration for writing");return false;}
-        // Persist only the ten GBA controls; accept legacy V2 files on load.
-        out<<"CipherGBA_SDL_INPUT_V1\n";
-        for(unsigned i=0;i<10;i++)
-            out<<static_cast<int>(keyMap_[i])<<' '<<static_cast<int>(padMap_[i])<<'\n';
+        // V3 adds SDL controller-axis/direction mappings. V1/V2 remain readable.
+        out<<"CipherGBA_SDL_INPUT_V3\n";
+        for(unsigned i=0;i<10;++i){
+            out<<int(keyMap_[i])<<' '<<int(padMap_[i])<<' '
+               <<axisMap_[i].axis<<' '<<axisMap_[i].direction<<'\n';
+        }
         out.flush();out.close();
         if(!out){message("Input configuration write failed");return false;}
         return true;
@@ -343,18 +349,27 @@ struct Application {
         std::ifstream in(bindingsFile());
         if(!in)return;
         std::string magic;
-        if(!(in>>magic) || (magic!="CipherGBA_SDL_INPUT_V1" && magic!="CipherGBA_SDL_INPUT_V2"))return;
+        if(!(in>>magic))return;
+        const bool v3=magic=="CipherGBA_SDL_INPUT_V3";
+        if(!v3&&magic!="CipherGBA_SDL_INPUT_V1"&&magic!="CipherGBA_SDL_INPUT_V2")return;
         KeyMap newKeys=defaultKeys_;
         PadMap newPad=defaultPad_;
-        for(unsigned i=0;i<10;i++){
-            int key=0,pad=0;
-            if(!(in>>key>>pad) || key<0 || key>=SDL_NUM_SCANCODES ||
-               pad<-1 || pad>=SDL_CONTROLLER_BUTTON_MAX)return;
+        AxisMap newAxes{};
+        for(unsigned i=0;i<10;++i){
+            int key=0,pad=0,axis=-1,direction=0;
+            if(!(in>>key>>pad))return;
+            if(v3&&!(in>>axis>>direction))return;
+            if(key<0||key>=SDL_NUM_SCANCODES||
+               pad<-1||pad>=SDL_CONTROLLER_BUTTON_MAX||
+               axis<-1||axis>=SDL_CONTROLLER_AXIS_MAX||
+               (axis>=0&&(direction!=-1&&direction!=1))||
+               (axis==-1&&direction!=0))return;
             newKeys[i]=static_cast<SDL_Scancode>(key);
             newPad[i]=static_cast<SDL_GameControllerButton>(pad);
+            newAxes[i]={axis,direction};
         }
-        // Ignore V2's removed eleventh host action; preserve all ten GBA bindings.
-        keyMap_=newKeys;padMap_=newPad;
+        // V2 may contain one obsolete extra fast-forward row. Intentionally ignore.
+        keyMap_=newKeys;padMap_=newPad;axisMap_=newAxes;
     }
     void mappingTitle(){
         std::string title="CipherGBA | Remap ";
@@ -846,6 +861,17 @@ struct Application {
             if(controller&&SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(controller))
                ==event.cbutton.which){
                 padMap_[remapIndex_]=static_cast<SDL_GameControllerButton>(event.cbutton.button);
+                axisMap_[remapIndex_]={};
+                finishMapping();
+            }
+            return;
+        }
+        if(remap_==RemapMode::Gamepad && event.type==SDL_CONTROLLERAXISMOTION){
+            if(controller&&SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(controller))
+                ==event.caxis.which&&std::abs(int(event.caxis.value))>20000){
+                axisMap_[remapIndex_]={int(event.caxis.axis),
+                    event.caxis.value>0?1:-1};
+                padMap_[remapIndex_]=SDL_CONTROLLER_BUTTON_INVALID;
                 finishMapping();
             }
             return;
@@ -939,7 +965,16 @@ struct Application {
             const auto axis=[this](SDL_GameControllerAxis a){
                 return SDL_GameControllerGetAxis(controller,a);
             };
-            for(unsigned i=0;i<10;i++)buttons[i]=buttons[i]||btn(padMap_[i]);
+            for(unsigned i=0;i<10;i++){
+                buttons[i]=buttons[i]||btn(padMap_[i]);
+                const auto mapped=axisMap_[i];
+                if(mapped.axis>=0 && mapped.axis<SDL_CONTROLLER_AXIS_MAX &&
+                    mapped.direction!=0){
+                    const int v=int(SDL_GameControllerGetAxis(
+                        controller,static_cast<SDL_GameControllerAxis>(mapped.axis)));
+                    buttons[i]=buttons[i]||(v*mapped.direction>11000);
+                }
+            }
             // Left-stick navigation remains available independently of remaps.
             buttons[4]=buttons[4]||axis(SDL_CONTROLLER_AXIS_LEFTX)>11000;
             buttons[5]=buttons[5]||axis(SDL_CONTROLLER_AXIS_LEFTX)<-11000;
