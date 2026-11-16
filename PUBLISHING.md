@@ -1,32 +1,26 @@
-# Publish CipherGBA v0.1 to a new GitHub repository
+# Repository maintenance and release procedure
 
-The source archive is prepared for a **new** `HodgkinsStudios/CipherGBA` repository. No GitHub actions were performed during this archive preparation. There are no compiled emulator binaries, BIOS files, game ROMs, test outputs or private saves in the source ZIP.
+**Repository:** [HodgkinsStudios/CipherGBA](https://github.com/HodgkinsStudios/CipherGBA)  
+**Default branch:** `main`  
+**Latest published release:** [v0.3.0](https://github.com/HodgkinsStudios/CipherGBA/releases/tag/v0.3.0)
 
-## 1. Create the new repository
+## Documentation-only maintenance
 
-After deleting the original repository on GitHub, extract the v0.1 source ZIP into an empty local directory and open a shell there. With Git and the authenticated GitHub CLI (`gh`) installed:
+Documentation updates may be committed to `main` without changing the emulator version. Do **not** create a new tag, re-upload existing release files, or describe a docs-only commit as a new binary release. Update the [changelog](CHANGELOG.md) under **Unreleased** for editorial changes.
 
-```sh
-git init -b main
-git add .
-git commit -m "CipherGBA v0.1 initial source release"
-gh repo create HodgkinsStudios/CipherGBA --public --source=. --remote=origin --push
-```
+The automated [portability workflow](.github/workflows/portability.yml) can still run after a push to `main`. The current [release workflow](.github/workflows/release.yml) contains an immutable-tag guard: it **refuses to overwrite an existing version**. Documentation commits do not require running the release job manually.
 
-Alternatively, create an empty repository at GitHub and use `git remote add origin https://github.com/HodgkinsStudios/CipherGBA.git` followed by `git push -u origin main`.
+## Future software releases
 
-## 2. Validate all platform packages
+For an intentional versioned release:
 
-The `.github/workflows/linux.yml` and `.github/workflows/portability.yml` workflows run on pushes to `main`. Confirm that the **full portability workflow, including `release-assets`, passes on the exact intended commit**. The workflow builds/stages Windows x64, macOS Intel/Apple Silicon, Linux X11, AppImage and Flatpak outputs, and verifies the combined packages and SHA-256 manifests. Build success is not proof of manual gameplay validation on each OS; see [platform acceptance](docs/PLATFORM_ACCEPTANCE.md).
+1. Agree on the next version and scope; implement and verify the code changes on a branch.
+2. Update version constants, packaging names, release workflow settings, README download references, changelog and [release notes](RELEASE_NOTES.md) together.
+3. Merge the verified work and confirm the full [cross-platform build matrix](.github/workflows/portability.yml) passes for the **exact intended main commit**.
+4. Verify platform packages, the combined archive, and `SHA256SUMS.txt`.
+5. Publish a **new immutable tag**, using release assets from that passing commit only.
+6. Preserve older GitHub releases and their original binaries.
 
-## 3. Publish the v0.1.0 release
+Do not use this document as instructions to create, delete, or recreate the existing repository. No BIOS files, copyrighted ROMs, private saves, test outputs, or compiled build intermediates belong in the source repository.
 
-Once the full portability workflow completes successfully for `main`, in GitHub Actions manually run **Publish CipherGBA v0.1** (`release.yml`). The workflow refuses to publish if it cannot find a successful multi-platform build for the current main commit, and refuses to overwrite an existing `v0.1.0` tag. It downloads exactly that CI run's assembled assets, verifies checksums, and publishes them under the release tag `v0.1.0` using [RELEASE_NOTES.md](RELEASE_NOTES.md).
-
-For the GitHub CLI, after the CI run is green:
-
-```sh
-gh workflow run release.yml --ref main
-```
-
-The first push should not contain binaries or third-party games/firmware. On future changes, update the documented version, workflows, package names and release notes together before tagging another release.
+Automated compilation is not a substitute for testing the desktop frontends on actual devices. See [platform acceptance](docs/PLATFORM_ACCEPTANCE.md) and [third-party notices](THIRD_PARTY_NOTICES.md).

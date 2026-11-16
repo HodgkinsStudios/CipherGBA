@@ -1,4 +1,4 @@
-# GBA cheat-code support (CipherGBA v0.1)
+# GBA cheat-code support
 
 CipherGBA supports encrypted **GameShark Advance v1/v2**, encrypted **Action Replay / GameShark v3/v4**, **CodeBreaker/Xploder**, and direct RAW cheats. The editor uses explicit prefixes because both GameShark v1/v2 and Action Replay v3/v4 have 16-digit code lines but incompatible encryption keys.
 

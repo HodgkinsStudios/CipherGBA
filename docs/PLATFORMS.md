@@ -1,27 +1,28 @@
-# CipherGBA v0.3 desktop platforms and original UI parity
+# Supported desktop platforms
 
-The same current `CipherGBA_Core` implementation powers two desktop renderers. The **Linux X11 frontend from v0.1.0** is the sole UI layout reference for v0.3; the CP93 dashboard design is **not** used.
+CipherGBA runs on Windows, macOS, and Linux using its C++17 core and two desktop frontends.
 
-| Target | Renderer | Distributed as | Validation still required |
+| Platform | Frontend | Distribution | Additional notes |
 | --- | --- | --- | --- |
-| Ubuntu Linux X11/XWayland x86_64 | Original Xlib layout | Native executable + shared core | Full game/audio/controller desktop sessions |
-| Linux x86_64 portable | Matched SDL2 layout | AppImage | Host desktop and file chooser compatibility |
-| Linux x86_64 Flatpak | Matched SDL2 layout | Flatpak | Sandboxed file portals and persistent data |
-| Windows x64 | Matched SDL2 layout | ZIP with DLL dependencies | Windows keyboard/gamepad/audio and DPI behavior |
-| macOS Apple Silicon | Matched SDL2 layout | Ad-hoc-signed app in ZIP | Real macOS behavior and Gatekeeper |
-| macOS Intel x86_64 | Matched SDL2 layout | Ad-hoc-signed app in ZIP | Real macOS behavior and Gatekeeper |
+| Windows x64 | SDL2 | ZIP with required DLLs | Keep bundled files together |
+| macOS Apple Silicon | SDL2 | App ZIP | Ad-hoc signed; not notarized |
+| macOS Intel x86_64 | SDL2 | App ZIP | Ad-hoc signed; not notarized |
+| Linux X11/XWayland x86_64 | Native Xlib | ZIP with shared core library | X11-capable desktop required |
+| Linux x86_64 | SDL2 | AppImage | Mark file executable before running |
+| Linux x86_64 | SDL2 | Flatpak | Requires freedesktop 25.08 runtime |
 
-## Original interface common to all
+Every desktop frontend presents the same seven-menu layout, game viewport, and compact status bar. The native X11 frontend uses its desktop font and host input APIs; SDL2 uses an embedded bitmap font, SDL controller button/axis mappings, and OS-specific file dialogs.
 
-- Default 1050×720 window; menu bar 38 pixels tall and status strip 30 pixels tall, scaled for high-DPI displays.
-- **File | Input | Configure | System | TAS | Cheats | Help**, in that exact order. Hover/open dropdown and nested selections.
-- No-ROM state is a dark/empty viewport with the status bar; no launcher, dashboard, or logo replacing the viewport.
-- Controller mapping (ten GBA buttons), cheat management and About displayed within the primary window.
-- Fullscreen hides the top menu until the pointer returns to it. Stretched fullscreen remains an explicit selection.
-- Original audio/ROM/state/cheat/TAS/recording actions exposed via the corresponding menus. No fast-forward or rewind controls.
+## Files and local settings
 
-**Renderer differences:** X11 uses native desktop Xlib font rendering and Linux joystick axes; SDL2 uses embedded mixed-case bitmap glyphs, SDL gamepad buttons/axes and portable input binding files. These are implementation differences, not intentional changes to the original screen layout. Native ROM and BIOS file pickers are host-specific. SDL2 also provides an in-window directory-path editor for changing AVI output location because directory selection APIs are not universal across all targets.
+The native Linux frontend uses its own `CipherGBA_Data` data directory. Portable SDL2 builds use per-user application-data locations appropriate to their host operating system. Keyboard/gamepad configuration files are frontend-specific and should not be interchanged blindly.
 
-Native Linux X11 stores its original `CipherGBA_Data` files. SDL2 uses host-specific per-user application-data directories. The optional `--import-data DIR` is non-destructive; it does not import incompatible X11 keyboard mapping files.
+The optional SDL2 command-line argument `--import-data DIR` copies compatible existing BIOS, save, state, TAS, and cheat files from an existing data folder **without overwriting** destination files. It does not import incompatible X11 keyboard mappings.
 
-The [full interface specification](FRONTEND_CLASSIC_V01.md), [acceptance checklist](PLATFORM_ACCEPTANCE.md), and [build workflow](../.github/workflows/portability.yml) distinguish source-level UI parity from device-specific interaction tests.
+## Building
+
+On Linux, CMake defaults to the native X11 frontend. Pass `-DCIPHERGBA_FRONTEND=SDL2` to select SDL2, or `-DPIXELGBA_BUILD_GUI=OFF` to build the core without a UI. The project includes packaging workflows for the other supported operating systems.
+
+See the [main README](../README.md) for installation instructions and exact package links, [frontend documentation](FRONTEND.md) for menu behavior, and [platform acceptance](PLATFORM_ACCEPTANCE.md) for real-device testing.
+
+Automated cross-platform CI verifies compilation, selected smoke tests, and release package assembly, but it does not certify graphics, sound, controller operation, or full-speed gameplay on all physical systems.
