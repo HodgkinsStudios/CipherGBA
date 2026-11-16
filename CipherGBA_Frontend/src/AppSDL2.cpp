@@ -113,11 +113,6 @@ struct Application {
         SDL_CONTROLLER_BUTTON_RIGHTSHOULDER,SDL_CONTROLLER_BUTTON_LEFTSHOULDER}};
     KeyMap keyMap_=defaultKeys_,oldKeyMap_=defaultKeys_;
     PadMap padMap_=defaultPad_,oldPadMap_=defaultPad_;
-    // CP93 exposed fast-forward as the eleventh remappable action.
-    // It is host-side only and does not change the GBA core button mask.
-    SDL_Scancode fastKey_=SDL_SCANCODE_TAB,oldFastKey_=SDL_SCANCODE_TAB;
-    SDL_GameControllerButton fastPad_=SDL_CONTROLLER_BUTTON_INVALID;
-    SDL_GameControllerButton oldFastPad_=SDL_CONTROLLER_BUTTON_INVALID;
 
     int stateSlot=1;
     int uiMenu_=-1, uiMouseX_=-1, uiMouseY_=-1;
@@ -335,10 +330,10 @@ struct Application {
         if(ec){message("Cannot create input configuration directory: "+ec.message());return false;}
         std::ofstream out(bindingsFile(),std::ios::trunc);
         if(!out){message("Cannot open input configuration for writing");return false;}
-        out<<"CipherGBA_SDL_INPUT_V2\n";
+        // Persist only the ten GBA controls; accept legacy V2 files on load.
+        out<<"CipherGBA_SDL_INPUT_V1\n";
         for(unsigned i=0;i<10;i++)
             out<<static_cast<int>(keyMap_[i])<<' '<<static_cast<int>(padMap_[i])<<'\n';
-        out<<static_cast<int>(fastKey_)<<' '<<static_cast<int>(fastPad_)<<'\n';
         out.flush();out.close();
         if(!out){message("Input configuration write failed");return false;}
         return true;
@@ -357,20 +352,12 @@ struct Application {
             newKeys[i]=static_cast<SDL_Scancode>(key);
             newPad[i]=static_cast<SDL_GameControllerButton>(pad);
         }
-        SDL_Scancode newFastKey=SDL_SCANCODE_TAB;
-        SDL_GameControllerButton newFastPad=SDL_CONTROLLER_BUTTON_INVALID;
-        if(magic=="CipherGBA_SDL_INPUT_V2"){
-            int fk=0,fp=0;
-            if(!(in>>fk>>fp)||fk<0||fk>=SDL_NUM_SCANCODES||
-               fp<-1||fp>=SDL_CONTROLLER_BUTTON_MAX)return;
-            newFastKey=static_cast<SDL_Scancode>(fk);
-            newFastPad=static_cast<SDL_GameControllerButton>(fp);
-        }
-        keyMap_=newKeys;padMap_=newPad;fastKey_=newFastKey;fastPad_=newFastPad;
+        // Ignore V2's removed eleventh host action; preserve all ten GBA bindings.
+        keyMap_=newKeys;padMap_=newPad;
     }
     void mappingTitle(){
         std::string title="CipherGBA | Remap ";
-        title+=remapIndex_<10?buttonNames_[remapIndex_]:"FAST FORWARD";
+        title+=buttonNames_[remapIndex_];
         title+=remap_==RemapMode::Keyboard ?
             " keyboard: press key (Delete=unassign, Esc=cancel)":
             " gamepad: press controller button (Esc=cancel)";
@@ -886,7 +873,7 @@ struct Application {
         const int top=uiBarHeight()+8*uiScale(),row=uiPopupRow();
         if(uiSubmenu_){
             const int subLeft=uiSubmenuX(w),subTop=uiSubmenuY();
-            const int subRow=40*uiScale(),count=uiSubmenu_==1?5:uiSubmenu_==2?6:4;
+            const int subRow=40*uiScale(),count=uiSubmenu_==1?4:uiSubmenu_==2?6:4;
             if(x>=subLeft&&x<subLeft+270*uiScale()&&y>=subTop&&y<subTop+count*subRow){
                 const int index=(y-subTop)/subRow;
                 return (uiSubmenu_==1?101:uiSubmenu_==2?110:120)+index;
@@ -911,7 +898,6 @@ struct Application {
     }
     void uiOpenInput(){
         oldKeyMap_=keyMap_;oldPadMap_=padMap_;
-        oldFastKey_=fastKey_;oldFastPad_=fastPad_;
         pausedBeforeInput_=paused;paused=true;
         remap_=RemapMode::None;uiPanel_=UiPanel::Input;
     }
@@ -920,7 +906,6 @@ struct Application {
             if(!saveBindings())return;
         }else{
             keyMap_=oldKeyMap_;padMap_=oldPadMap_;
-            fastKey_=oldFastKey_;fastPad_=oldFastPad_;
         }
         remap_=RemapMode::None;uiCaptureSingle_=false;
         uiPanel_=UiPanel::Game;paused=pausedBeforeInput_;
@@ -942,7 +927,7 @@ struct Application {
         case 11:stretched=!stretched;break;
         case 12:paused=!paused;break;
         case 13:muted=!muted;break;
-        case 14:speedPercent_=speedPercent_==25?50:speedPercent_==50?75:speedPercent_==75?100:speedPercent_==100?200:25;break;
+        case 14:speedPercent_=speedPercent_==25?50:speedPercent_==50?75:speedPercent_==75?100:25;break;
         case 15:audioChannelsMenu();break;
         case 16:uiOpenInput();break;
         case 17:uiPanel_=UiPanel::Cheats;break;
@@ -968,7 +953,6 @@ struct Application {
         case 102:speedPercent_=50;break;
         case 103:speedPercent_=75;break;
         case 104:speedPercent_=100;break;
-        case 105:speedPercent_=200;break;
         case 120:case 121:case 122:case 123:stateSlot=command-119;break;
         case 110:case 111:case 112:case 113:case 114:case 115:
             core.setAudioChannelMask(core.audioChannelMask()^(1u<<(command-110)));break;
@@ -1066,16 +1050,16 @@ struct Application {
         }
         if(uiSubmenu_){
             const int subX=uiSubmenuX(w),subY=uiSubmenuY(),subRow=40*sc;
-            const int count=uiSubmenu_==1?5:uiSubmenu_==2?6:4;
+            const int count=uiSubmenu_==1?4:uiSubmenu_==2?6:4;
             uiFill(subX,subY,270*sc,count*subRow+8*sc,{31,55,76,255});
             uiOutline(subX,subY,270*sc,count*subRow+8*sc,{113,162,200,255});
             const char* speeds[]={"25% QUARTER SPEED","50% HALF SPEED","75% REDUCED SPEED",
-                                 "100% NORMAL SPEED","200% DOUBLE SPEED"};
+                                 "100% NORMAL SPEED"};
             const char* channels[]={"SQUARE 1","SQUARE 2","WAVE","NOISE",
                                     "DIRECT SOUND A","DIRECT SOUND B"};
             for(int i=0;i<count;++i){
                 const int yy=subY+i*subRow;
-                bool checked=uiSubmenu_==1?speedPercent_==(i==0?25:i==1?50:i==2?75:i==3?100:200):
+                bool checked=uiSubmenu_==1?speedPercent_==(i==0?25:i==1?50:i==2?75:100):
                              uiSubmenu_==2?(core.audioChannelMask()&(1u<<i))!=0:
                              stateSlot==i+1;
                 if(uiMouseX_>=subX&&uiMouseX_<subX+270*sc&&
@@ -1151,14 +1135,14 @@ struct Application {
         uiText("ACTION",106*sc,217*sc,2);
         uiText("KEYBOARD",351*sc,217*sc,2);
         uiText("GAMEPAD",670*sc,217*sc,2);
-        const int rowHeight=std::max(25,std::min(34,(ch-366)/11));
-        for(int i=0;i<11;++i){
+        const int rowHeight=std::max(26,std::min(34,(ch-366)/10));
+        for(int i=0;i<10;++i){
             const int y=248+i*rowHeight;
             uiFill(32*sc,y*sc,(cw-64)*sc,(rowHeight-1)*sc,
                    i%2?SDL_Color{14,28,45,255}:SDL_Color{21,43,64,255});
-            uiText(i==10?"FAST FORWARD":buttonNames_[i],115*sc,(y+9)*sc,1);
-            const char* kn=SDL_GetScancodeName(i==10?fastKey_:keyMap_[i]);
-            const char* pn=SDL_GameControllerGetStringForButton(i==10?fastPad_:padMap_[i]);
+            uiText(buttonNames_[i],115*sc,(y+9)*sc,1);
+            const char* kn=SDL_GetScancodeName(keyMap_[i]);
+            const char* pn=SDL_GameControllerGetStringForButton(padMap_[i]);
             const std::string name=(kn&&*kn)?kn:"UNASSIGNED";
             const std::string pad=(pn&&*pn)?pn:"UNASSIGNED";
             uiButton(233,y+1,280,rowHeight-2,
@@ -1201,9 +1185,9 @@ struct Application {
         int w=0,h=0;SDL_GetRendererOutputSize(renderer,&w,&h);
         const int rw=w/sc,rh=h/sc;
         if(uiPanel_==UiPanel::Input){
-            const int rowHeight=std::max(25,std::min(34,(rh-366)/11));
+            const int rowHeight=std::max(26,std::min(34,(rh-366)/10));
             const int line=y/sc-248;
-            if(line>=0&&line<11*rowHeight){
+            if(line>=0&&line<10*rowHeight){
                 const int row=line/rowHeight;
                 if(uiWithin(x,y,233,248+row*rowHeight,280,rowHeight-1)){
                     remap_=RemapMode::Keyboard;remapIndex_=unsigned(row);
@@ -1218,7 +1202,6 @@ struct Application {
             if(uiWithin(x,y,34,rh-113,145,47))uiCloseInput(true);
             else if(uiWithin(x,y,197,rh-113,245,47)){
                 keyMap_=defaultKeys_;padMap_=defaultPad_;
-                fastKey_=SDL_SCANCODE_TAB;fastPad_=SDL_CONTROLLER_BUTTON_INVALID;
                 remap_=RemapMode::None;
             }else if(uiWithin(x,y,rw-191,rh-113,157,47))uiCloseInput(false);
         }else if(uiPanel_==UiPanel::Cheats){
@@ -1314,9 +1297,7 @@ struct Application {
         if(remap_==RemapMode::Gamepad && event.type==SDL_CONTROLLERBUTTONDOWN){
             if(controller && SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(controller))
                   ==event.cbutton.which){
-                if(remapIndex_<10)
-                    padMap_[remapIndex_]=static_cast<SDL_GameControllerButton>(event.cbutton.button);
-                else fastPad_=static_cast<SDL_GameControllerButton>(event.cbutton.button);
+                padMap_[remapIndex_]=static_cast<SDL_GameControllerButton>(event.cbutton.button);
                 finishMapping();
             }
             return;
@@ -1351,10 +1332,8 @@ struct Application {
                 return;
             }
             if(remap_==RemapMode::Keyboard){
-                if(remapIndex_<10)
-                    keyMap_[remapIndex_]=key==SDLK_DELETE?SDL_SCANCODE_UNKNOWN:
-                        event.key.keysym.scancode;
-                else fastKey_=key==SDLK_DELETE?SDL_SCANCODE_UNKNOWN:event.key.keysym.scancode;
+                keyMap_[remapIndex_]=key==SDLK_DELETE?SDL_SCANCODE_UNKNOWN:
+                    event.key.keysym.scancode;
                 finishMapping();
             }
             return;
@@ -1399,7 +1378,7 @@ struct Application {
         }
         return buttons;
     }
-    void runFrame(bool fastForward){
+    void runFrame(){
         auto buttons=input();
         std::uint16_t mask=0;
         for(unsigned i=0;i<10;i++)if(buttons[i])mask|=std::uint16_t(1u<<i);
@@ -1420,11 +1399,11 @@ struct Application {
             avi_.close();
             message("AVI recording stopped: file limit or I/O error");
         }
-        if(audio && !muted && !fastForward){
+        if(audio && !muted){
             if(SDL_GetQueuedAudioSize(audio)>32768)SDL_ClearQueuedAudio(audio);
             if(!samples.empty())SDL_QueueAudio(audio,samples.data(),
                 static_cast<std::uint32_t>(samples.size()*sizeof(std::int16_t)));
-        }else if(audio && fastForward)SDL_ClearQueuedAudio(audio);
+        }
     }
     void render(){
         int w=0,h=0;SDL_GetRendererOutputSize(renderer,&w,&h);
@@ -1473,26 +1452,16 @@ struct Application {
             SDL_Event e{};
             while(SDL_PollEvent(&e))handleEvent(e);
             if(!running)break;
-            const auto* keyboard=SDL_GetKeyboardState(nullptr);
-            const bool fast=(fastKey_!=SDL_SCANCODE_UNKNOWN && keyboard[fastKey_])||
-                (controller && SDL_GameControllerGetAttached(controller) &&
-                 fastPad_!=SDL_CONTROLLER_BUTTON_INVALID &&
-                 SDL_GameControllerGetButton(controller,fastPad_));
             const auto now=Clock::now();
-            if(!paused && core.cartridge().loaded() && (fast || now>=next)){
-                const int runs=fast?4:1;
-                for(int i=0;i<runs;i++){
-                    runFrame(fast);
-                    ++totalFrames;
-                    if(smokeFrameLimit && totalFrames>=smokeFrameLimit)return 0;
-                }
-                count+=static_cast<unsigned>(runs);
-                if(fast){next=Clock::now();}else{
-                    const auto framePeriod=std::chrono::duration<double>(
-                        100.0/(kFramesPerSecond*speedPercent_));
-                    next+=std::chrono::duration_cast<Clock::duration>(framePeriod);
-                    if(next+std::chrono::milliseconds(100)<Clock::now())next=Clock::now();
-                }
+            if(!paused && core.cartridge().loaded() && now>=next){
+                runFrame();
+                ++totalFrames;
+                if(smokeFrameLimit && totalFrames>=smokeFrameLimit)return 0;
+                ++count;
+                const auto framePeriod=std::chrono::duration<double>(
+                    100.0/(kFramesPerSecond*speedPercent_));
+                next+=std::chrono::duration_cast<Clock::duration>(framePeriod);
+                if(next+std::chrono::milliseconds(100)<Clock::now())next=Clock::now();
             }
             render();
             if(uiSmokeFrameLimit && ++uiFrames>=uiSmokeFrameLimit)return 0;
@@ -1515,7 +1484,7 @@ struct Application {
                 SDL_SetWindowTitle(window,title.str().c_str());
                 statusAt=update;count=0;
             }
-            if(!fast && next>update){
+            if(next>update){
                 const auto left=std::chrono::duration_cast<std::chrono::milliseconds>(next-update);
                 if(left.count()>1)SDL_Delay(static_cast<Uint32>(std::min<long long>(left.count()-1,4)));
                 else SDL_Delay(1);
@@ -1527,10 +1496,10 @@ struct Application {
 void help(){
     std::puts("CipherGBA v0.1 (SDL2 frontend)");
     std::puts("Usage: CipherGBA [--rom PATH] [--bios PATH] [--import-data DIR] [--verify-rom PATH] [--smoke-frames N] [--ui-smoke-frames N] [--help] [--version]");
-    std::puts("F1: Main menu. Ctrl+O: Open ROM; Ctrl+B: Import BIOS; Ctrl+I: Input remap.");
+    std::puts("F1: Library menu. Ctrl+O: Open ROM; Ctrl+B: Import BIOS; Ctrl+I: Input remap.");
     std::puts("Controls: Z=A X=B Backspace=Select Enter=Start Arrows=D-pad A=L S=R");
     std::puts("F2 Reset, F3 TAS, F4 Mute, F5 Save, F6 Slot, F7 Pause, F8 Load, F9 PNG");
-    std::puts("F10 Stretch, F11/Escape Fullscreen, F12 AVI record, Tab Fast-forward.");
+    std::puts("F10 Stretch, F11/Escape Fullscreen, F12 AVI record.");
     std::puts("User save data uses the OS-specific SDL preferences directory.");
     std::puts("--import-data DIR copies existing saves/states/TAS/cheats/BIOS without overwriting.");
     std::puts("You may also drag the old CipherGBA_Data folder onto the SDL2 window.");
