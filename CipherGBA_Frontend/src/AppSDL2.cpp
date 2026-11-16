@@ -805,6 +805,8 @@ struct Application {
     UiPanel uiPanel_=UiPanel::Game;
     bool uiCaptureSingle_=false;
     bool uiToast_=false, uiTimer_=false;
+    std::string uiToastMessage_;
+    std::chrono::steady_clock::time_point uiToastUntil_{};
     int uiCheatScroll_=0;
     struct UiEntry {const char* label;int action;};
     std::vector<UiEntry> uiEntries(int tab) const {
@@ -901,7 +903,7 @@ struct Application {
         case 11:stretched=!stretched;break;
         case 12:paused=!paused;break;
         case 13:muted=!muted;break;
-        case 14:speedPercent_=speedPercent_==100?50:speedPercent_==50?25:100;break;
+        case 14:speedPercent_=speedPercent_==25?50:speedPercent_==50?75:speedPercent_==75?100:speedPercent_==100?200:25;break;
         case 15:audioChannelsMenu();break;
         case 16:uiOpenInput();break;
         case 17:uiPanel_=UiPanel::Cheats;break;
@@ -910,7 +912,14 @@ struct Application {
         case 20:if(core.cartridge().loaded()){
             std::string error;if(!core.flushSave(error)&&!error.empty())message(error);
         }break;
-        case 21:toggleAvi();break;
+        case 21:{
+            const bool previouslyRecording=avi_.active();
+            if(toggleAvi()&&uiToast_){
+                uiToastMessage_=previouslyRecording?"AVI RECORDING SAVED":"AVI RECORDING STARTED";
+                uiToastUntil_=std::chrono::steady_clock::now()+std::chrono::seconds(3);
+            }
+            break;
+        }
         case 22:uiToast_=!uiToast_;break;
         case 23:uiTimer_=!uiTimer_;break;
         case 24:if(!fullscreen)toggleFullscreen();stretched=true;break;
@@ -983,7 +992,10 @@ struct Application {
             std::string stats="STATE "+std::to_string(stateSlot)+"  "+std::to_string(speedPercent_)+"%";
             if(paused)stats+="  PAUSED";
             if(muted)stats+="  MUTED";
-            if(avi_.active())stats+="  REC";
+            if(avi_.active()){
+                stats+="  REC";
+                if(uiTimer_)stats+=" "+std::to_string(avi_.frames()/60u)+"S";
+            }
             uiText(stats,w/2,h-44*sc,1,{255,211,118,255});
             uiText("CIPHERGBA  |  HODGKINSSTUDIOS",w/2,h-20*sc,1,{129,164,193,255});
         }
@@ -1158,7 +1170,7 @@ struct Application {
         paused=originalPause;
         if(selected==1)fileMenu();
         else if(selected==2)systemMenu();
-        else if(selected==3)openInputMenu();
+        else if(selected==3)uiOpenInput();
         else if(selected==4)cheatMenu();
         else if(selected==5)tasMenu();
         else if(selected==6)about();
@@ -1269,10 +1281,10 @@ struct Application {
         }
         if((event.key.keysym.mod & KMOD_CTRL) && key==SDLK_o)chooseFile(false);
         else if((event.key.keysym.mod & KMOD_CTRL) && key==SDLK_b)chooseFile(true);
-        else if((event.key.keysym.mod & KMOD_CTRL) && key==SDLK_i)openInputMenu();
+        else if((event.key.keysym.mod & KMOD_CTRL) && key==SDLK_i)uiOpenInput();
         else if(key==SDLK_F1)mainMenu();
         else if(key==SDLK_F3)tasMenu();
-        else if(key==SDLK_F12)toggleAvi();
+        else if(key==SDLK_F12)uiAction(21);
         else if(key==SDLK_ESCAPE||key==SDLK_F11)toggleFullscreen();
         else if(key==SDLK_F7)paused=!paused;
         else if(key==SDLK_F5)saveState();
@@ -1362,6 +1374,12 @@ struct Application {
             uiDrawNoRom(w,top,bottom);
         }
         if(chrome)uiDrawChrome(w,h);
+        if(uiToast_ && std::chrono::steady_clock::now()<uiToastUntil_){
+            const int sc=uiScale();
+            uiFill(std::max(0,(w-430*sc)/2),h-155*sc,430*sc,48*sc,{10,25,40,255});
+            uiOutline(std::max(0,(w-430*sc)/2),h-155*sc,430*sc,48*sc,{255,211,91,255});
+            uiText(uiToastMessage_,w/2,h-140*sc,1,{255,226,162,255});
+        }
         SDL_RenderPresent(renderer);
     }
     int loop(unsigned smokeFrameLimit=0){
