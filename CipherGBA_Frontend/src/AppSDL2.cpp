@@ -84,7 +84,7 @@ struct Application {
     SDL_Window* window=nullptr;
     SDL_Renderer* renderer=nullptr;
     SDL_Texture* texture=nullptr;
-    SDL_Texture* aboutArtwork_=nullptr;
+    // Artwork is decoded only by the About dialog; never a startup splash.
     SDL_GameController* controller=nullptr;
     SDL_AudioDeviceID audio=0;
     fs::path data;
@@ -115,6 +115,7 @@ struct Application {
     PadMap padMap_=defaultPad_,oldPadMap_=defaultPad_;
 
     int stateSlot=1;
+    int uiMenu_=-1, uiMouseX_=-1, uiMouseY_=-1;
     std::string romName;
     std::chrono::steady_clock::time_point frameDeadline{};
     ~Application() {
@@ -127,7 +128,6 @@ struct Application {
         }
         if(audio)SDL_CloseAudioDevice(audio);
         if(controller)SDL_GameControllerClose(controller);
-        if(aboutArtwork_)SDL_DestroyTexture(aboutArtwork_);
         if(texture)SDL_DestroyTexture(texture);
         if(renderer)SDL_DestroyRenderer(renderer);
         if(window)SDL_DestroyWindow(window);
@@ -141,6 +141,7 @@ struct Application {
             SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,720,480,
             SDL_WINDOW_RESIZABLE|SDL_WINDOW_ALLOW_HIGHDPI);
         if(!window){errorMessage(nullptr,SDL_GetError());return false;}
+        SDL_SetWindowMinimumSize(window,560,360);
         renderer=SDL_CreateRenderer(window,-1,SDL_RENDERER_ACCELERATED|SDL_RENDERER_PRESENTVSYNC);
         if(!renderer)renderer=SDL_CreateRenderer(window,-1,SDL_RENDERER_SOFTWARE);
         if(!renderer){errorMessage(window,SDL_GetError());return false;}
@@ -155,17 +156,6 @@ struct Application {
             SDL_Surface* icon=SDL_CreateRGBSurfaceWithFormatFrom(iconPixels.data(),
                 64,64,32,64*4,SDL_PIXELFORMAT_RGBA32);
             if(icon){SDL_SetWindowIcon(window,icon);SDL_FreeSurface(icon);}
-        }
-        std::vector<unsigned char> aboutPixels;
-        if(pixelgba::artwork::decode(pixelgba::artwork::kAboutArtwork,aboutPixels)){
-            const auto& art=pixelgba::artwork::kAboutArtwork;
-            aboutArtwork_=SDL_CreateTexture(renderer,SDL_PIXELFORMAT_RGBA32,
-                SDL_TEXTUREACCESS_STATIC,art.width,art.height);
-            if(aboutArtwork_){
-                if(SDL_UpdateTexture(aboutArtwork_,nullptr,aboutPixels.data(),art.width*4)!=0){
-                    SDL_DestroyTexture(aboutArtwork_);aboutArtwork_=nullptr;
-                }else SDL_SetTextureBlendMode(aboutArtwork_,SDL_BLENDMODE_BLEND);
-            }
         }
         if(char* pref=SDL_GetPrefPath("HodgkinsStudios","CipherGBA")){
             data=fs::u8path(pref);
@@ -802,6 +792,144 @@ struct Application {
         }
     }
 
+
+    // Persistent clickable menus for Windows, macOS, AppImage and Flatpak.
+    // Use the dependency-free bitmap font; the logo is reserved for About.
+    struct UiEntry {const char* label; int action;};
+    std::vector<UiEntry> uiEntries(int tab) const {
+        switch(tab){
+        case 0: return {{"OPEN ROM",1},{"IMPORT BIOS",2},{"SAVE STATE",3},
+                        {"LOAD STATE",4},{"SCREENSHOT",5},{"NEXT STATE SLOT",6},
+                        {"RESET ROM",7},{"QUIT",8}};
+        case 1: return {{"TOGGLE FULLSCREEN",9},{"WINDOWED",10},
+                        {"TOGGLE STRETCH",11},{"PAUSE OR RESUME",12},
+                        {"MUTE OR UNMUTE",13},{"CYCLE EMULATION SPEED",14},
+                        {"AUDIO CHANNELS",15}};
+        case 2: return {{"INPUT MAPPING",16},{"CHEAT CODES",17},
+                        {"TAS RECORDING",18}};
+        case 3: return {{"ABOUT CIPHERGBA",19}};
+        default: return {};
+        }
+    }
+    int uiScale() const {
+        int ww=0,wh=0,rw=0,rh=0;
+        SDL_GetWindowSize(window,&ww,&wh);
+        SDL_GetRendererOutputSize(renderer,&rw,&rh);
+        return std::clamp((rw+std::max(1,ww)/2)/std::max(1,ww),1,3);
+    }
+    int uiBarHeight() const{return 38*uiScale();}
+    int uiStatusHeight() const{return 26*uiScale();}
+    bool uiChromeVisible() const {
+        return !fullscreen || uiMenu_>=0 || (uiMouseY_>=0 && uiMouseY_<uiBarHeight());
+    }
+    int uiTabAt(int x,int y) const {
+        const int scale=uiScale();
+        if(y<0 || y>=uiBarHeight())return -1;
+        const int left=12*scale, tabWidth=116*scale;
+        return x>=left && x<left+4*tabWidth ? (x-left)/tabWidth : -1;
+    }
+    void uiMapMouse(int& x,int& y) const {
+        int ww=0,wh=0,rw=0,rh=0;
+        SDL_GetWindowSize(window,&ww,&wh);
+        SDL_GetRendererOutputSize(renderer,&rw,&rh);
+        x=x*rw/std::max(1,ww);
+        y=y*rh/std::max(1,wh);
+    }
+    int uiPopupX(int tab,int screenWidth) const {
+        const int scale=uiScale();
+        return std::max(0,std::min((12+116*tab)*scale,screenWidth-300*scale));
+    }
+    int uiActionAt(int x,int y) const {
+        if(uiMenu_<0)return 0;
+        int w=0,h=0;SDL_GetRendererOutputSize(renderer,&w,&h);
+        const int scale=uiScale(), left=uiPopupX(uiMenu_,w);
+        const int rowHeight=30*scale;
+        const auto entries=uiEntries(uiMenu_);
+        if(x<left || x>=left+300*scale || y<uiBarHeight() ||
+           y>=uiBarHeight()+static_cast<int>(entries.size())*rowHeight)return 0;
+        return entries[static_cast<std::size_t>((y-uiBarHeight())/rowHeight)].action;
+    }
+    void uiAction(int command){
+        switch(command){
+        case 1: chooseFile(false);break;
+        case 2: chooseFile(true);break;
+        case 3: saveState();break;
+        case 4: loadState();break;
+        case 5: screenshot();break;
+        case 6: stateSlot=stateSlot%4+1;break;
+        case 7: if(core.cartridge().loaded()){core.reset();if(audio)SDL_ClearQueuedAudio(audio);}break;
+        case 8: running=false;break;
+        case 9: toggleFullscreen();break;
+        case 10: if(fullscreen)toggleFullscreen();break;
+        case 11: stretched=!stretched;break;
+        case 12: paused=!paused;break;
+        case 13: muted=!muted;break;
+        case 14: speedPercent_=speedPercent_==100?50:speedPercent_==50?25:100;break;
+        case 15: audioChannelsMenu();break;
+        case 16: openInputMenu();break;
+        case 17: cheatMenu();break;
+        case 18: tasMenu();break;
+        case 19: about();break;
+        default: break;
+        }
+    }
+    void uiFill(int x,int y,int w,int h,SDL_Color c) {
+        SDL_SetRenderDrawColor(renderer,c.r,c.g,c.b,c.a);
+        const SDL_Rect rectangle{x,y,w,h};
+        SDL_RenderFillRect(renderer,&rectangle);
+    }
+    void uiDrawChrome(int w,int h) {
+        if(!uiChromeVisible())return;
+        const int scale=uiScale(), barHeight=uiBarHeight();
+        const int statusHeight=uiStatusHeight();
+        uiFill(0,0,w,barHeight,{31,39,54,255});
+        uiFill(0,barHeight-2*scale,w,2*scale,{67,91,122,255});
+        const char* tabs[]={"FILE","SYSTEM","CONFIG","HELP"};
+        for(int i=0;i<4;++i){
+            const int x=(12+116*i)*scale;
+            if(i==uiMenu_ || uiTabAt(uiMouseX_,uiMouseY_)==i)
+                uiFill(x,3*scale,116*scale,31*scale,
+                       i==uiMenu_?SDL_Color{68,102,145,255}:SDL_Color{45,61,82,255});
+            ciphergba_about::text(renderer,tabs[i],x+58*scale,11*scale,2*scale);
+        }
+        uiFill(0,h-statusHeight,w,statusHeight,{25,31,43,255});
+        uiFill(0,h-statusHeight,w,scale,{67,91,122,255});
+        const char* state=core.cartridge().loaded()?(paused?"PAUSED":"RUNNING"):"NO ROM LOADED";
+        ciphergba_about::text(renderer,
+            std::string("CIPHERGBA | ")+state,
+            std::min(w/2,160*scale),h-statusHeight+8*scale,scale,
+            {191,205,226,255});
+        if(w>=670*scale)
+            ciphergba_about::text(renderer,
+                "F1 MENU | ESC FULLSCREEN",w-150*scale,
+                h-statusHeight+8*scale,scale,{145,171,203,255});
+        if(uiMenu_<0)return;
+        const auto entries=uiEntries(uiMenu_);
+        const int left=uiPopupX(uiMenu_,w), rowHeight=30*scale;
+        const int popupHeight=static_cast<int>(entries.size())*rowHeight;
+        uiFill(left,barHeight,300*scale,popupHeight+2*scale,{43,54,73,255});
+        uiFill(left,barHeight,scale,popupHeight,{91,117,152,255});
+        for(std::size_t i=0;i<entries.size();++i){
+            const int y=barHeight+static_cast<int>(i)*rowHeight;
+            if(uiMouseX_>=left && uiMouseX_<left+300*scale &&
+               uiMouseY_>=y && uiMouseY_<y+rowHeight)
+                uiFill(left+2*scale,y,296*scale,rowHeight,{75,111,153,255});
+            ciphergba_about::text(renderer,entries[i].label,
+                left+150*scale,y+9*scale,2*scale,{239,245,255,255});
+        }
+    }
+    void uiDrawNoRom(int w,int top,int bottom) {
+        const int scale=uiScale();
+        const int middle=top+(bottom-top)/2;
+        ciphergba_about::text(renderer,"CIPHERGBA",w/2,
+                              middle-65*scale,4*scale,{224,235,255,255});
+        ciphergba_about::text(renderer,"GAME BOY ADVANCE EMULATOR",w/2,
+                              middle-17*scale,2*scale,{166,185,212,255});
+        ciphergba_about::text(renderer,"NO GAME LOADED",w/2,
+                              middle+22*scale,2*scale,{228,237,250,255});
+        ciphergba_about::text(renderer,"FILE - OPEN ROM  OR  CTRL+O",w/2,
+                              middle+55*scale,2*scale,{155,185,227,255});
+    }
     void mainMenu(){
         const bool originalPause=paused;
         paused=true;
@@ -830,6 +958,29 @@ struct Application {
         else if(selected==6)about();
     }
     void handleEvent(const SDL_Event& event){
+        if(event.type==SDL_MOUSEMOTION){
+            int x=event.motion.x,y=event.motion.y;uiMapMouse(x,y);
+            uiMouseX_=x;uiMouseY_=y;
+            if(uiMenu_>=0){
+                const int tab=uiTabAt(x,y);
+                if(tab>=0)uiMenu_=tab;
+            }
+            return;
+        }
+        if(event.type==SDL_MOUSEBUTTONDOWN && event.button.button==SDL_BUTTON_LEFT){
+            int x=event.button.x,y=event.button.y;uiMapMouse(x,y);
+            uiMouseX_=x;uiMouseY_=y;
+            if(uiChromeVisible()){
+                const int tab=uiTabAt(x,y);
+                if(tab>=0){uiMenu_=uiMenu_==tab?-1:tab;return;}
+            }
+            if(uiMenu_>=0){
+                const int command=uiActionAt(x,y);
+                uiMenu_=-1;
+                if(command)uiAction(command);
+                return;
+            }
+        }
         if(event.type==SDL_QUIT){running=false;return;}
         if(event.type==SDL_DROPFILE){
             if(event.drop.file){
@@ -877,6 +1028,7 @@ struct Application {
         }
         if(event.type!=SDL_KEYDOWN||event.key.repeat)return;
         const auto key=event.key.keysym.sym;
+        if(uiMenu_>=0 && key==SDLK_ESCAPE){uiMenu_=-1;return;}
         if(remap_!=RemapMode::None){
             if(key==SDLK_ESCAPE){remap_=RemapMode::None;openInputMenu(true);return;}
             if(remap_==RemapMode::Keyboard){
@@ -954,23 +1106,30 @@ struct Application {
         }else if(audio && fastForward)SDL_ClearQueuedAudio(audio);
     }
     void render(){
+        int w=0,h=0;SDL_GetRendererOutputSize(renderer,&w,&h);
+        const bool chrome=uiChromeVisible();
+        const int top=chrome?uiBarHeight():0;
+        const int bottom=h-(chrome?uiStatusHeight():0);
         SDL_SetRenderDrawColor(renderer,10,14,19,255);
         SDL_RenderClear(renderer);
         if(core.cartridge().loaded()){
             const auto& frame=core.framebuffer();
             for(std::size_t i=0;i<rgba.size();i++)rgba[i]=0xff000000u|frame[i];
             SDL_UpdateTexture(texture,nullptr,rgba.data(),kWidth*int(sizeof(std::uint32_t)));
-            int w=0,h=0;SDL_GetRendererOutputSize(renderer,&w,&h);
-            SDL_Rect rect{0,0,w,h};
+            SDL_Rect rect{0,top,w,std::max(1,bottom-top)};
             if(!stretched){
-                const float factor=std::min(float(w)/kWidth,float(h)/kHeight);
+                const float factor=std::min(float(w)/kWidth,float(bottom-top)/kHeight);
                 const float scale=factor>=1.0f?std::floor(factor):factor;
-                rect.w=std::max(1,int(kWidth*scale));rect.h=std::max(1,int(kHeight*scale));
-                rect.x=(w-rect.w)/2;rect.y=(h-rect.h)/2;
+                rect.w=std::max(1,int(kWidth*scale));
+                rect.h=std::max(1,int(kHeight*scale));
+                rect.x=(w-rect.w)/2;
+                rect.y=top+(bottom-top-rect.h)/2;
             }
             SDL_RenderCopy(renderer,texture,nullptr,&rect);
+        }else{
+            uiDrawNoRom(w,top,bottom);
         }
-
+        if(chrome)uiDrawChrome(w,h);
         SDL_RenderPresent(renderer);
     }
     int loop(unsigned smokeFrameLimit=0){
@@ -1087,9 +1246,7 @@ int main(int argc,char** argv){
     if(!oldData.empty()&&!app.importLegacyData(userPath(oldData)))return 1;
     if(!bios.empty()&&!app.loadBios(userPath(bios)))return 1;
     if(!rom.empty()&&!app.loadRom(userPath(rom)))return 1;
-    // With no cartridge, expose the actual frontend controls immediately instead
-    // of using the About artwork as a full-window placeholder. Headless ROM
-    // smoke tests and command-line ROM launches bypass the startup menu.
-    if(rom.empty() && !smokeFrames)app.mainMenu();
+    // Startup draws the visible File/System/Config/Help toolbar itself.
+    // About artwork never replaces the emulator frontend.
     return app.loop(smokeFrames);
 }
