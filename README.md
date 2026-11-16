@@ -1,8 +1,8 @@
 <p align="center"><img src="assets/branding/ciphergba_icon.png" alt="CipherGBA application logo" width="520"></p>
-<h1 align="center">CipherGBA</h1>
+<h1 align="center">CipherGBA v0.2</h1>
 <p align="center">A portable C++17 Game Boy Advance emulator by <strong>HodgkinsStudios</strong></p>
 
-<p align="center"><a href="https://github.com/HodgkinsStudios/CipherGBA/releases/tag/v0.1.0">Latest published release (v0.1.0)</a> · <a href="RELEASE_NOTES.md">Release notes</a> · <a href="docs/ACCURACY.md">Accuracy report</a> · <a href="https://github.com/HodgkinsStudios/CipherGBA/actions/workflows/portability.yml">Build checks</a></p>
+<p align="center"><a href="https://github.com/HodgkinsStudios/CipherGBA/releases/tag/v0.2.0">Release downloads (v0.2.0)</a> · <a href="RELEASE_NOTES.md">Release notes</a> · <a href="docs/ACCURACY.md">Accuracy report</a> · <a href="https://github.com/HodgkinsStudios/CipherGBA/actions/workflows/portability.yml">Build checks</a></p>
 
 CipherGBA emulates the Game Boy Advance using an independently maintained GBA core, integrated BIOS high-level emulation (HLE), and optional user-supplied original 16 KiB BIOS firmware. It provides a native Linux X11 frontend and a portable SDL2 frontend for Windows, macOS and Linux.
 
@@ -22,26 +22,26 @@ Both frontend implementations follow the six-tab **Library / Settings / System /
 
 The native Linux X11 frontend uses Xlib; Windows, macOS and portable Linux builds render the corresponding interface using SDL2. Their dialog implementations, menus and feature depth are not yet visually or functionally identical in every detail. The original CP93 C++ core is **not** included: the current GBA core remains unchanged. See [the frontend migration notes](docs/FRONTEND_CP93.md) and [platform differences](docs/PLATFORMS.md).
 
-The project artwork is used in this README, for the **application icon**, and in the **About** view only—not as the emulator's main window. The earlier screenshot has been removed from this README because it does not represent the restored CP93 layout. A verified new screenshot should be captured from an actual v0.2 desktop build before release.
+The project artwork is used in this README, for the **application icon**, and in the **About** view only—not as the emulator's main window. The earlier screenshot has been removed from this README because it does not represent the restored CP93 layout. The CP93 source design was compared against the restored Linux X11 desktop view; interactive validation on target machines remains documented in the acceptance checklist.
 
 ## Supported release packages
 
-The assets below describe the already-published **v0.1.0** release, which predates the CP93 frontend restoration. The forthcoming **v0.2** release must use newly built, independently validated artifacts. Do not mistake the v0.1.0 downloads for updated frontend builds.
+The v0.2.0 packages below are assembled exclusively from one fully successful, same-commit cross-platform CI run. The previous v0.1.0 release remains separately available in GitHub's release history.
 
 | Platform | Release asset |
 | --- | --- |
-| Windows x64 | `CipherGBA-v0.1-Windows-x64.zip` |
-| macOS Apple Silicon | `CipherGBA-v0.1-macOS-arm64.zip` |
-| macOS Intel | `CipherGBA-v0.1-macOS-x86_64.zip` |
-| Linux X11 x86_64 | `CipherGBA-v0.1-Linux-X11-x86_64.zip` |
-| Linux AppImage x86_64 | `CipherGBA-v0.1-Linux-x86_64.AppImage` |
-| Linux Flatpak x86_64 | `CipherGBA-v0.1-Linux-x86_64.flatpak` |
-| Complete bundle | `CipherGBA-v0.1-ALL-PLATFORMS.zip` |
-| Source code | `CipherGBA-v0.1-Source.zip` |
+| Windows x64 | `CipherGBA-v0.2-Windows-x64.zip` |
+| macOS Apple Silicon | `CipherGBA-v0.2-macOS-arm64.zip` |
+| macOS Intel | `CipherGBA-v0.2-macOS-x86_64.zip` |
+| Linux X11 x86_64 | `CipherGBA-v0.2-Linux-X11-x86_64.zip` |
+| Linux AppImage x86_64 | `CipherGBA-v0.2-Linux-x86_64.AppImage` |
+| Linux Flatpak x86_64 | `CipherGBA-v0.2-Linux-x86_64.flatpak` |
+| Complete bundle | `CipherGBA-v0.2-ALL-PLATFORMS.zip` |
+| Source code | `CipherGBA-v0.2-Source.zip` |
 
 **Windows:** unzip fully and run `CipherGBA.exe` with the adjacent DLL dependencies. **macOS:** unzip the package for your processor and launch `CipherGBA.app`; apps are ad-hoc signed, **not notarized**, and macOS may display security warnings. **Linux X11:** keep `CipherGBA` and `libCipherGBA_Core.so.1` together; host X11 and runtime dependencies are needed.
 
-**AppImage:** set executable permission (`chmod +x CipherGBA-v0.1-Linux-x86_64.AppImage`), then launch the file. **Flatpak:** install with `flatpak install --user ./CipherGBA-v0.1-Linux-x86_64.flatpak`, then use `flatpak run io.github.hodgkinsstudios.CipherGBA`. Flatpak requires the freedesktop 25.08 runtime. See the [platform checklist](docs/PLATFORM_ACCEPTANCE.md) for unverified device-specific behavior.
+**AppImage:** set executable permission (`chmod +x CipherGBA-v0.2-Linux-x86_64.AppImage`), then launch the file. **Flatpak:** install with `flatpak install --user ./CipherGBA-v0.2-Linux-x86_64.flatpak`, then use `flatpak run io.github.hodgkinsstudios.CipherGBA`. Flatpak requires the freedesktop 25.08 runtime. See the [platform checklist](docs/PLATFORM_ACCEPTANCE.md) for unverified device-specific behavior.
 
 ## Build from source
 

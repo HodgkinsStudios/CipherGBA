@@ -137,7 +137,7 @@ struct Application {
         if(SDL_Init(SDL_INIT_VIDEO|SDL_INIT_GAMECONTROLLER)!=0){
             errorMessage(nullptr,SDL_GetError());return false;
         }
-        window=SDL_CreateWindow("CipherGBA v0.1 - F1 Menu | Ctrl+O Open ROM",
+        window=SDL_CreateWindow("CipherGBA v0.2 - F1 Menu | Ctrl+O Open ROM",
             SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,1240,900,
             SDL_WINDOW_RESIZABLE|SDL_WINDOW_ALLOW_HIGHDPI);
         if(!window){errorMessage(nullptr,SDL_GetError());return false;}
@@ -267,7 +267,7 @@ struct Application {
         paused=false;uiPanel_=UiPanel::Game;
         if(audio)SDL_ClearQueuedAudio(audio);
         frameDeadline=std::chrono::steady_clock::now();
-        SDL_SetWindowTitle(window,("CipherGBA v0.1 - "+romName).c_str());
+        SDL_SetWindowTitle(window,("CipherGBA v0.2 - "+romName).c_str());
         return true;
     }
     bool loadBios(const fs::path& file){
@@ -442,12 +442,12 @@ struct Application {
     void about(){
         const bool oldPaused=paused;
         paused=true;
-        SDL_Window* dialog=SDL_CreateWindow("About CipherGBA v0.1 | HodgkinsStudios",
+        SDL_Window* dialog=SDL_CreateWindow("About CipherGBA v0.2 | HodgkinsStudios",
             SDL_WINDOWPOS_CENTERED,SDL_WINDOWPOS_CENTERED,640,740,
             SDL_WINDOW_RESIZABLE|SDL_WINDOW_ALLOW_HIGHDPI);
         if(!dialog){
             SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION,"About CipherGBA",
-                "CipherGBA v0.1.0 | HodgkinsStudios\nGame Boy Advance Emulator | C++17",
+                "CipherGBA v0.2.0 | HodgkinsStudios\nGame Boy Advance Emulator | C++17",
                 window);
             paused=oldPaused;return;
         }
@@ -486,7 +486,7 @@ struct Application {
             SDL_Rect area{(w-size)/2,12,size,size};
             if(picture)SDL_RenderCopy(drawing,picture,nullptr,&area);
             const int y=12+size+18;
-            ciphergba_about::text(drawing,"CIPHERGBA V0.1.0",w/2,y,2);
+            ciphergba_about::text(drawing,"CIPHERGBA V0.2.0",w/2,y,2);
             ciphergba_about::text(drawing,"HODGKINSSTUDIOS",w/2,y+24,2,{200,157,255,255});
             ciphergba_about::text(drawing,"GAME BOY ADVANCE EMULATOR",w/2,y+48,2);
             ciphergba_about::text(drawing,"C++17 | HLE / ORIGINAL BIOS",w/2,y+72,2);
@@ -1468,7 +1468,7 @@ struct Application {
             const auto update=Clock::now();
             if(update-statusAt>=std::chrono::seconds(1)){
                 const double interval=std::chrono::duration<double>(update-statusAt).count();
-                std::ostringstream title;title<<"CipherGBA v0.1";
+                std::ostringstream title;title<<"CipherGBA v0.2";
                 if(!romName.empty())title<<" - "<<romName;
                 else title<<" | F1 Menu / Ctrl+O Open ROM";
                 title<<" | "<<std::fixed<<std::setprecision(1)<<count/interval<<" FPS";
@@ -1494,7 +1494,7 @@ struct Application {
     }
 };
 void help(){
-    std::puts("CipherGBA v0.1 (SDL2 frontend)");
+    std::puts("CipherGBA v0.2 (SDL2 frontend)");
     std::puts("Usage: CipherGBA [--rom PATH] [--bios PATH] [--import-data DIR] [--verify-rom PATH] [--smoke-frames N] [--ui-smoke-frames N] [--help] [--version]");
     std::puts("F1: Library menu. Ctrl+O: Open ROM; Ctrl+B: Import BIOS; Ctrl+I: Input remap.");
     std::puts("Controls: Z=A X=B Backspace=Select Enter=Start Arrows=D-pad A=L S=R");
@@ -1510,7 +1510,7 @@ int main(int argc,char** argv){
     unsigned smokeFrames=0,uiSmokeFrames=0;
     for(int i=1;i<argc;i++){
         const std::string arg=argv[i];
-        if(arg=="--version"){std::puts("CipherGBA v0.1.0");return 0;}
+        if(arg=="--version"){std::puts("CipherGBA v0.2.0");return 0;}
         if(arg=="--ui-smoke-frames" && i+1<argc){
             const std::string value=argv[++i];
             char* end=nullptr;

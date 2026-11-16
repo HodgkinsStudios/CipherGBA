@@ -967,7 +967,7 @@ private:
             const int logoH=logoW*artwork::kAboutArtwork.height/artwork::kAboutArtwork.width;
             drawAboutBrand((w_-logoW)/2,Bar+15,logoW);
             const int baseline=Bar+logoH+54;
-            label(28,baseline,"CipherGBA v0.1.0  |  C++17  |  HodgkinsStudios",0xe2edff);
+            label(28,baseline,"CipherGBA v0.2.0  |  C++17  |  HodgkinsStudios",0xe2edff);
             label(28,baseline+34,"Game Boy Advance Emulator  -  Linux X11/XWayland",0xcbd9e9);
             label(28,baseline+68,"ARM7TDMI  |  Integrated HLE or user-supplied original BIOS",0xcbd9e9);
             label(28,baseline+102,"suite.gba: 6,994 / 6,998 in both BIOS modes; 4 HBlank cases unresolved",0x9ebbd6);
@@ -1252,9 +1252,9 @@ private:
 int main(int argc,char** argv){
         for(int i=1;i<argc;++i){
             const std::string arg=argv[i];
-            if(arg=="--version"){std::puts("CipherGBA v0.1.0");return 0;}
+            if(arg=="--version"){std::puts("CipherGBA v0.2.0");return 0;}
             if(arg=="--help"){
-                std::puts("CipherGBA v0.1 - GBA emulator for Linux");
+                std::puts("CipherGBA v0.2 - GBA emulator for Linux");
                 std::puts("Usage: CipherGBA [--rom PATH] [--bios PATH] [--help] [--version]");
                 std::puts("Without --bios, the integrated HLE BIOS is used unless a saved BIOS is installed.");
                 return 0;

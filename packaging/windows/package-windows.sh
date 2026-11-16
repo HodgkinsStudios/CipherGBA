@@ -4,13 +4,13 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 command -v ldd >/dev/null || { echo 'ldd is required' >&2;exit 2; }
-name="CipherGBA-v0.1-Windows-x64-CI"
+name="CipherGBA-v0.2-Windows-x64-CI"
 dest="dist/$name"
 mkdir -p "$dest"
 cp bin/CipherGBA.exe "$dest/"
 cp README.md RELEASE_NOTES.md THIRD_PARTY_NOTICES.md "$dest/"
 cat > "$dest/START_HERE.txt" <<'EOF'
-CipherGBA v0.1 — Windows x64 CI build
+CipherGBA v0.2 — Windows x64 CI build
 Start CipherGBA.exe. Press Ctrl+O to open a ROM, or drag and drop a GBA
 ROM (.gba or .zip) onto the emulator window. Ctrl+B imports an original
 16KiB GBA BIOS. You may also pass --rom /path/to/game.gba on the command line.
