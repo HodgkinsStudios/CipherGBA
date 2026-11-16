@@ -1438,12 +1438,13 @@ struct Application {
         }
         SDL_RenderPresent(renderer);
     }
-    int loop(unsigned smokeFrameLimit=0){
+    int loop(unsigned smokeFrameLimit=0,unsigned uiSmokeFrameLimit=0){
         using Clock=std::chrono::steady_clock;
         auto next=Clock::now();
         auto statusAt=next;
         unsigned count=0;
         unsigned totalFrames=0;
+        unsigned uiFrames=0;
         while(running){
             SDL_Event e{};
             while(SDL_PollEvent(&e))handleEvent(e);
@@ -1466,6 +1467,7 @@ struct Application {
                 }
             }
             render();
+            if(uiSmokeFrameLimit && ++uiFrames>=uiSmokeFrameLimit)return 0;
             const auto update=Clock::now();
             if(update-statusAt>=std::chrono::seconds(1)){
                 const double interval=std::chrono::duration<double>(update-statusAt).count();
@@ -1496,7 +1498,7 @@ struct Application {
 };
 void help(){
     std::puts("CipherGBA v0.1 (SDL2 frontend)");
-    std::puts("Usage: CipherGBA [--rom PATH] [--bios PATH] [--import-data DIR] [--verify-rom PATH] [--smoke-frames N] [--help] [--version]");
+    std::puts("Usage: CipherGBA [--rom PATH] [--bios PATH] [--import-data DIR] [--verify-rom PATH] [--smoke-frames N] [--ui-smoke-frames N] [--help] [--version]");
     std::puts("F1: Main menu. Ctrl+O: Open ROM; Ctrl+B: Import BIOS; Ctrl+I: Input remap.");
     std::puts("Controls: Z=A X=B Backspace=Select Enter=Start Arrows=D-pad A=L S=R");
     std::puts("F2 Reset, F3 TAS, F4 Mute, F5 Save, F6 Slot, F7 Pause, F8 Load, F9 PNG");
@@ -1508,10 +1510,20 @@ void help(){
 }
 int main(int argc,char** argv){
     std::string rom,bios,verify,oldData;
-    unsigned smokeFrames=0;
+    unsigned smokeFrames=0,uiSmokeFrames=0;
     for(int i=1;i<argc;i++){
         const std::string arg=argv[i];
         if(arg=="--version"){std::puts("CipherGBA v0.1.0");return 0;}
+        if(arg=="--ui-smoke-frames" && i+1<argc){
+            const std::string value=argv[++i];
+            char* end=nullptr;
+            const auto parsed=std::strtol(value.c_str(),&end,10);
+            if(!end||*end!='\0'||parsed<1||parsed>300){
+                std::fprintf(stderr,"--ui-smoke-frames must be 1..300\n");return 2;
+            }
+            uiSmokeFrames=static_cast<unsigned>(parsed);
+            continue;
+        }
         if(arg=="--help"){help();return 0;}
         if(arg=="--smoke-frames" && i+1<argc){
             const std::string value=argv[++i];
@@ -1554,5 +1566,5 @@ int main(int argc,char** argv){
     if(!rom.empty()&&!app.loadRom(userPath(rom)))return 1;
     // Startup draws the visible File/System/Config/Help toolbar itself.
     // About artwork never replaces the emulator frontend.
-    return app.loop(smokeFrames);
+    return app.loop(smokeFrames,uiSmokeFrames);
 }
