@@ -1273,11 +1273,9 @@ struct Application {
                 if(command)uiAction(command);
                 return;
             }
-            if(uiPanel_!=UiPanel::Game || !core.cartridge().loaded()){
-                uiPanelClick(x,y);return;
-            }
             int ww=0,hh=0;SDL_GetRendererOutputSize(renderer,&ww,&hh);
             const int sc=uiScale();
+            // Header quick-actions also work before a game is loaded.
             if(uiChromeVisible()&&ww>1050*sc && y<uiBarHeight()){
                 if(x>=ww-221*sc&&x<ww-166*sc){screenshot();return;}
                 if(x>=ww-158*sc&&x<ww-20*sc){
@@ -1285,6 +1283,9 @@ struct Application {
                     else paused=!paused;
                     return;
                 }
+            }
+            if(uiPanel_!=UiPanel::Game || !core.cartridge().loaded()){
+                uiPanelClick(x,y);return;
             }
         }
         if(event.type==SDL_QUIT){running=false;return;}
