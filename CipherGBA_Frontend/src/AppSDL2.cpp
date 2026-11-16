@@ -1226,33 +1226,6 @@ struct Application {
             else if(uiWithin(x,y,margin+41+(left-69)/2,y+360,(left-69)/2,53))uiAction(16);
         }
     }
-    void mainMenu(){
-        const bool originalPause=paused;
-        paused=true;
-        SDL_MessageBoxButtonData buttons[]={{
-            SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT,1,"File / ROM / Saves"},{
-            0,2,"System / Display / Audio"},{
-            0,3,"Configure input"},{
-            0,4,"Cheat codes"},{
-            0,5,"TAS input recording"},{
-            0,6,"About CipherGBA"},{
-            SDL_MESSAGEBOX_BUTTON_ESCAPEKEY_DEFAULT,0,"Return to game"}};
-        SDL_MessageBoxData box{SDL_MESSAGEBOX_INFORMATION,window,
-            "CipherGBA - Menu",
-            "Portable SDL2 interface\n"
-            "F1: Menu | Ctrl+O: ROM | Ctrl+B: BIOS | Ctrl+I: Input\n"
-            "Some X11-specific features are not available in SDL2.",
-            7,buttons,nullptr};
-        int selected=0;
-        if(SDL_ShowMessageBox(&box,&selected)!=0)selected=0;
-        paused=originalPause;
-        if(selected==1)fileMenu();
-        else if(selected==2)systemMenu();
-        else if(selected==3)uiOpenInput();
-        else if(selected==4)cheatMenu();
-        else if(selected==5)tasMenu();
-        else if(selected==6)about();
-    }
     void handleEvent(const SDL_Event& event){
         if(event.type==SDL_MOUSEMOTION){
             int x=event.motion.x,y=event.motion.y;uiMapMouse(x,y);
